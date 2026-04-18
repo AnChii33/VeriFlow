@@ -87,7 +87,7 @@ def qna_rag(content,ask,modllm):
 
 #function to implement query expansion module
 def query_expand(usq,modellm,n=5):
-    prompt=f"""You are an helpful assistant for my multi-query conversational RAG.I want you to help me in query optimization for the RAG.
+    prompt=f"""You are a helpful assistant for my multi-query conversational RAG.I want you to help me in query optimization for the RAG.
                 
                  User may sometimes give query that are short and not good enough for the RAG pipeline. You need to Expand the given query.
                  
