@@ -1,10 +1,11 @@
 import os
-import faiss
-import pickle
-import numpy as np
-from sentence_transformers import SentenceTransformer
-from sentence_transformers import CrossEncoder
-import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain.retrievers.document_compressors import CrossEncoderReranker
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 
 def get_configuration(dotenv_path):
@@ -51,12 +52,6 @@ def rerank_with_cross_encoder(query, candidates, model_name):
 
     return scored_candidates
 
-#function to configure the llm
-def config(llm_model,api):
-    os.environ["GEMINI_API_KEY"]=api
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    llm=genai.GenerativeModel(llm_model)
-    return llm
 
 #function to generate rag response with the respective prompt
 def qna_rag(content,ask,modllm):
@@ -177,6 +172,7 @@ def query_optimize(useq,lastchat,modellm):
 
 def query_pipeline(env_path,useq,chats):
     embd_path,emb_name,sent_model,cross_model,api,llm_mod=get_configuration(env_path)
+    llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api)
     index,text,model=retrieve_requirement(embd_path, emb_name,sent_model)
     
     #Configuring the llm to be used
