@@ -8,6 +8,16 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 
+def create_chain(template, llm):
+    prompt = PromptTemplate.from_template(template)
+    return prompt | llm | StrOutputParser()
+
+QNA_TEMPLATE = """
+Generate a meaningful, detailed paragraph answer for the query based ONLY on the provided context. Answer clearly and understandably. Do not use phrases like "based on the context".
+Context: {context}
+Query: {query}
+"""
+
 def get_configuration(dotenv_path):
     load_dotenv(dotenv_path)
     embedding_path=os.getenv("embedding_path")
@@ -18,39 +28,6 @@ def get_configuration(dotenv_path):
     llm_model=os.getenv("llm_model")
     return embedding_path,embedding_name,sentence_transformer,cross_encode_model,api_key,llm_model
 
-
-#function to retrieve the index,chunktext and the embedding model
-def retrieve_requirement(fpath,fname,t_model):
-    ind=faiss.read_index(fpath+fname+".faiss")
-    with open(os.path.join(fpath,fname+".pkl"),"rb") as f:
-        chunks=pickle.load(f)
-    embd_model=SentenceTransformer(t_model)
-    return ind,chunks,embd_model
-
-#semantic query matching and retrieval of the chunks
-def semantic_chunks(user_q,n,embd_model,index,chtxt):
-    qembed=embd_model.encode([user_q])
-    distances,indices=index.search(np.array(qembed),n)
-    retrieved_info=[]
-    for idx in indices[0]:
-        retrieved_info.append(chtxt[idx])
-    return retrieved_info
-
-#reranking module
-def rerank_with_cross_encoder(query, candidates, model_name):
-    # Load cross-encoder model
-    cross_encoder = CrossEncoder(model_name)
-
-    # Prepare query-candidate pairs
-    pairs = [(query, passage) for passage in candidates]
-
-    # Get relevance scores
-    scores = cross_encoder.predict(pairs)
-
-    # Sort candidates by score
-    scored_candidates = sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)
-
-    return scored_candidates
 
 
 #function to generate rag response with the respective prompt
@@ -172,36 +149,46 @@ def query_optimize(useq,lastchat,modellm):
 
 def query_pipeline(env_path,useq,chats):
     embd_path,emb_name,sent_model,cross_model,api,llm_mod=get_configuration(env_path)
+
     llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api)
-    index,text,model=retrieve_requirement(embd_path, emb_name,sent_model)
-    
-    #Configuring the llm to be used
-    llm=config(llm_mod,api)
+
+    embeddings = HuggingFaceEmbeddings(model_name=sent_model)
+    vectorstore = FAISS.load_local(
+       folder_path=embd_path, 
+       embeddings=embeddings, 
+       index_name=emb_name, 
+       allow_dangerous_deserialization=True
+    ) # Required by LangChain to read your .pkl file
+
+    cross_encoder = HuggingFaceCrossEncoder(model_name=cross_model)
+    reranker = CrossEncoderReranker(model=cross_encoder, top_n=10)
+
     
     #Query Optimization
     query_list=query_optimize(useq,chats,llm)
-    
+
+    all_retrieved_docs = []
 
     for q in query_list:
         #retrieving the chunks that are similar to the given query.
         k=10#int(input("enter the no. of similar chunks to be extracted:"))
-        retrieved_chunks=semantic_chunks(q,k,model,index,text)
+        docs = vectorstore.similarity_search(q, k=5) 
+        all_retrieved_docs.extend(docs)
+
+    unique_docs = {doc.page_content: doc for doc in all_retrieved_docs}.values()
+    print("Reranking documents...")
+    reranked_docs = reranker.compress_documents(list(unique_docs), useq)
+
+    # Join the best chunks into a single context string
+    context = "\n\n".join([doc.page_content for doc in reranked_docs])
+    
+    # Create the LangChain Q&A chain and generate the answer
+    qna_chain = create_chain(QNA_TEMPLATE, llm)
+    
+    print(f"\nGenerating final answer for: {useq}...\n")
+    resp = qna_chain.invoke({"context": context, "query": useq})
+    
+    print(resp)
+    return resp
         
-        #incorporating re-ranking of the chunks
-        if(1):#int(input("enter 1 to incorporate re-ranking:"))
-            results = rerank_with_cross_encoder(q, retrieved_chunks,cross_model)
-            my=[]
-            for items in results:
-                my.append(items[0])
-            retrieved_chunks.clear()
-            retrieved_chunks.append(my)
-        
-        #creating Context
-        context="\n\n".join(str(i) for i in retrieved_chunks)
-        
-        #generating answer according to the query using llm
-        print("\n\n"+q+"\n")
-        resp=qna_rag(context,useq,llm)
-        print(resp)
-        return resp
 print("complete!!")
