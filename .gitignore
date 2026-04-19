@@ -12,3 +12,6 @@ backend/chroma_db/
 # Secrets and OS
 .env
 .DS_Store
+
+# Doc files.
+docs/
