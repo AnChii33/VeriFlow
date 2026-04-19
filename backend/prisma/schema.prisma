@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// The core document being analyzed
+model Template {
+  id           String   @id @default(uuid())
+  originalText String   @db.Text
+  status       String   @default("pending_ai")
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships mapping to your frontend types
+  flags        LegalFlag[]
+  redrafts     RedraftedTemplate[]
+}
+
+// Matches: export interface LegalFlag
+model LegalFlag {
+  id          String   @id @default(uuid())
+  templateId  String   // Foreign key linking it to the Template
+  
+  issue       String   @db.Text
+  cfr_section String
+  status      String   @default("pending") // "pending" | "confirmed" | "ignored"
+
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+// Matches: export interface RedraftedTemplate
+model RedraftedTemplate {
+  id          String   @id @default(uuid())
+  templateId  String   // Foreign key linking it to the Template
+  
+  text        String   @db.Text
+  status      String   @default("pending") // Using "pending" as default before user accepts/ignores
+
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
