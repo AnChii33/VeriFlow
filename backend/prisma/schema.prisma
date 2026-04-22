@@ -11,12 +11,15 @@ datasource db {
 model Template {
   id           String   @id @default(uuid())
   originalText String   @db.Text
-  status       String   @default("pending_ai")
+  status       String   @default("pending_ai_flags") // Updated the default status!
   
+  // NEW: Admin Tracking Fields
+  userId       String?  // The ID of the client who submitted it
+  reviewerId   String?  // The ID of the legal team member reviewing it
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relationships mapping to your frontend types
   flags        LegalFlag[]
   redrafts     RedraftedTemplate[]
 }
