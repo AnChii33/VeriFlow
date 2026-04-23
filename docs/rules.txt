@@ -1,0 +1,93 @@
+21 CFR Part 11 Compliance Auditing Checklist
+General Provisions
+Rule 1: Applicability of Electronic Records and Signatures
+Description: Electronic records and electronic signatures are considered legally equivalent to paper records and
+handwritten signatures when all requirements of 21 CFR Part 11 are met.
+Rationale: Ensures that electronic documentation is recognized as valid and enforceable under FDA regulations.
+Measurable Criteria: System must demonstrate full compliance with all applicable sections of 21 CFR Part 11.
+Evidence Requirements: Certification statements, system documentation, FDA acceptance letters.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 2: Scope of Application
+Description: Applies to electronic records created, modified, maintained, archived, retrieved, or transmitted under FDA
+regulations.
+Rationale: Clarifies the types of records and systems subject to Part 11.
+Measurable Criteria: All electronic records under FDA jurisdiction must be identified and evaluated for compliance.
+Evidence Requirements: Regulatory mapping, record classification documents.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Electronic Records
+Rule 3: System Validation
+Description: Systems managing electronic records must be validated to ensure accuracy, reliability, and consistent
+performance.
+Rationale: Validation ensures the integrity and reliability of electronic records.
+Measurable Criteria: Documented validation protocols and test results must be available.
+Evidence Requirements: Validation reports, SOPs, test logs.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 4: Audit Trails
+Description: Systems must generate secure, time-stamped audit trails that record all actions related to electronic
+records.
+Rationale: Audit trails provide accountability and traceability.
+Measurable Criteria: Audit trails must be tamper-proof, retained for the record's lifecycle, and available for FDA review.
+Evidence Requirements: Audit trail samples, system configuration screenshots.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+
+21 CFR Part 11 Compliance Auditing Checklist
+Evidence Notes:
+Rule 5: Record Retention and Retrieval
+Description: Electronic records must be protected and retrievable throughout their retention period.
+Rationale: Ensures records are accessible for audits and inspections.
+Measurable Criteria: Secure storage and retrieval mechanisms must be in place.
+Evidence Requirements: Archive access logs, retrieval test reports.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Electronic Signatures
+Rule 6: Uniqueness of Electronic Signatures
+Description: Each electronic signature must be unique to one individual and not reused or reassigned.
+Rationale: Prevents impersonation and ensures accountability.
+Measurable Criteria: Maintain a registry of electronic signatures and enforce uniqueness.
+Evidence Requirements: Signature assignment records, user ID logs.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 7: Signature Manifestations
+Description: Signed electronic records must include the signer's name, date/time of signing, and meaning of the
+signature.
+Rationale: Provides context and traceability for each signature.
+Measurable Criteria: All signed records must display required metadata in human-readable form.
+Evidence Requirements: Signed record samples, metadata logs.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 8: Signature/Record Linking
+Description: Electronic signatures must be linked to their respective records to prevent removal or falsification.
+Rationale: Maintains the integrity of signed records.
+Measurable Criteria: Technical controls must bind signatures to records securely.
+Evidence Requirements: System design documentation, linkage test results.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+
+21 CFR Part 11 Compliance Auditing Checklist
+System Controls
+Rule 9: Access Control
+Description: System access must be limited to authorized individuals using secure authentication.
+Rationale: Prevents unauthorized access and protects data integrity.
+Measurable Criteria: Use role-based access control and maintain access logs.
+Evidence Requirements: Access control policies, user access logs.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 10: Identification Code and Password Security
+Description: Identification codes and passwords must be unique, periodically reviewed, and protected against
+unauthorized use.
+Rationale: Ensures secure authentication and prevents misuse.
+Measurable Criteria: Implement password aging, loss management, and monitoring for unauthorized access.
+Evidence Requirements: Security policies, password audit reports.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+Rule 11: Training and Accountability
+Description: Personnel must be trained and held accountable for actions taken under their electronic signatures.
+Rationale: Ensures proper system use and deters misuse or falsification.
+Measurable Criteria: Maintain training records and enforce written accountability policies.
+Evidence Requirements: Training logs, signed accountability agreements.
+Compliance Status: [ ] Compliant   [ ] Non-Compliant   [ ] Not Applicable
+Evidence Notes:
+
