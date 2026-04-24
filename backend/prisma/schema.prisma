@@ -7,42 +7,97 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// The core document being analyzed
-model Template {
-  id           String   @id @default(uuid())
-  originalText String   @db.Text
-  status       String   @default("pending_ai_flags") // Updated the default status!
-  
-  // NEW: Admin Tracking Fields
-  userId       String?  // The ID of the client who submitted it
-  reviewerId   String?  // The ID of the legal team member reviewing it
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  flags        LegalFlag[]
-  redrafts     RedraftedTemplate[]
+model Company {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  domain      String?  @unique 
+  createdAt   DateTime @default(now())
+  clients     Client[]
 }
 
-// Matches: export interface LegalFlag
+model Client {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt    DateTime   @default(now())
+  templates    Template[]
+  signatures   SignatureRecord[]
+}
+
+model LegalReviewer {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String
+  barNumber    String?
+  createdAt    DateTime   @default(now())
+  assignedDocs Template[]
+  signatures   SignatureRecord[]
+}
+
+model Template {
+  id             String         @id @default(uuid())
+  content        String         @db.Text
+  status         String   
+  title          String   
+  documentType   String       
+  clientId       String   
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewerId     String?
+  reviewer       LegalReviewer? @relation(fields: [reviewerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  flags          LegalFlag[]
+  redrafts       RedraftedTemplate[]
+  auditLogs      AuditLog[]          
+  signatures     SignatureRecord[]   
+}
+
 model LegalFlag {
   id          String   @id @default(uuid())
-  templateId  String   // Foreign key linking it to the Template
-  
-  issue       String   @db.Text
+  templateId  String   
   cfr_section String
-  status      String   @default("pending") // "pending" | "confirmed" | "ignored"
-
+  explanation String   @db.Text
+  status      String   @default("pending") 
+  createdAt   DateTime @default(now())
   template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
-// Matches: export interface RedraftedTemplate
 model RedraftedTemplate {
   id          String   @id @default(uuid())
-  templateId  String   // Foreign key linking it to the Template
-  
-  text        String   @db.Text
-  status      String   @default("pending") // Using "pending" as default before user accepts/ignores
-
+  templateId  String   
+  modContent  String   @db.Text
+  status      String   @default("pending") 
+  createdAt   DateTime @default(now())
   template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  templateId  String
+  actorId     String
+  actorType   String    
+  prevState   String?   
+  newState    String   
+  details     String?   @db.Text 
+  createdAt   DateTime  @default(now())
+  template    Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model SignatureRecord {
+  id               String          @id @default(uuid())
+  templateId       String   
+  action           String          
+  clientId         String?
+  client           Client?         @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewerId       String?
+  reviewer         LegalReviewer?  @relation(fields: [reviewerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  printedName      String   
+  signatureMeaning String          
+  documentHash     String   
+  ipAddress        String?
+  userTrace        String?  
+  signedAt         DateTime        @default(now()) 
+  template         Template        @relation(fields: [templateId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
