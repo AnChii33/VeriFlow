@@ -187,4 +187,20 @@ def validate_template_pipeline(env_path, template_text):
     return final_report
 
         
-print("complete!!")
+# ==========================================
+# TEST EXECUTION MAIN BLOCK
+# ==========================================
+if __name__ == "__main__":
+    # A sample clause to test your pipeline
+    sample_clause = "“Hello, this is Zing Y. User one1 with Cordastin. Please confirm you agree to participate in branded messaging communications with me by replying to this number.  Message and data rates may apply. If you would instead like to opt out of future communications, please text "STOP" to this number. Learn more about how P360 protects your personal information by reading out privacy policy. 
+
+Click here for my contact card: https://ahins2srtportal.p360connect.biz/USGM838yBzy . As a reminder, please save this number in your contacts and use it to text me product questions."
+    
+    print("\nStarting Validation Pipeline...")
+    
+    # Call your pipeline function
+    # Make sure your .env file is in the same directory!
+    report = validate_template_pipeline(".env", sample_clause) 
+    
+    print("\n--- FINAL UI JSON PAYLOAD ---")
+    print(json.dumps(report, indent=4))
