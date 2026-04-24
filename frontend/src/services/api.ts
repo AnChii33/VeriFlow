@@ -46,5 +46,15 @@ export const veriflowApi = {
     });
     if (!response.ok) throw new Error('Response submission failed');
     return response.json();
+  },
+
+  login: async (payload: { email: string; password: string; role: 'CLIENT' | 'LEGAL' }) => {
+    const response = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error('Authentication failed');
+    return response.json();
   }
 };

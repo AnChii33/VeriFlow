@@ -1,18 +1,43 @@
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import AppButton from '../../components/base/AppButton';
 import InputField from '../../components/base/InputField';
 import { getDeviceTrace } from '../../utils/platform';
+import { veriflowApi } from '../../services/api';
 
 export default function AuthScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [userId, setUserId] = useState('user-123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   
-  // Pulling from the utility you correctly pointed out
   const { isWeb } = getDeviceTrace();
+
+  const handleLogin = async (role: 'CLIENT' | 'LEGAL') => {
+    if (!email || !password) {
+      isWeb ? alert("Please enter credentials") : Alert.alert("Error", "Please enter credentials");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await veriflowApi.login({ email, password, role });
+      
+      if (role === 'CLIENT') {
+        navigation.navigate('ClientDashboard', { clientId: data.userId });
+      } else {
+        navigation.navigate('ReviewerDashboard', { reviewerId: data.userId });
+      }
+    } catch (error) {
+      const msg = "Invalid email or password";
+      isWeb ? alert(msg) : Alert.alert("Login Failed", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Platform-specific styling logic
   const containerStyle = isWeb 
@@ -39,19 +64,29 @@ export default function AuthScreen() {
           </Text>
         </View>
 
-        <View className="mb-4">
+        <View className="gap-y-4 mb-6">
           <InputField 
-            label="Identity Reference" 
-            value={userId} 
-            onChangeText={setUserId} 
-            placeholder="Enter ID..."
+            label="Email Address" 
+            value={email} 
+            onChangeText={setEmail} 
+            placeholder="name@company.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <InputField 
+            label="Password" 
+            value={password} 
+            onChangeText={setPassword} 
+            placeholder="••••••••"
+            secureTextEntry
           />
         </View>
 
-        <View className="gap-y-4 mt-2">
+        <View className="gap-y-4">
           <AppButton 
-            title="Login to Workspace" 
-            onPress={() => navigation.navigate('ClientDashboard', { clientId: userId })} 
+            title={loading ? "Authenticating..." : "Login as Client"} 
+            onPress={() => handleLogin('CLIENT')} 
+            disabled={loading}
           />
           
           <View className={isWeb ? "flex-row gap-x-4" : "gap-y-4"}>
@@ -59,7 +94,8 @@ export default function AuthScreen() {
               <AppButton 
                 title="Legal Queue" 
                 variant="ghost"
-                onPress={() => navigation.navigate('ReviewerDashboard', { reviewerId: userId })} 
+                onPress={() => handleLogin('LEGAL')} 
+                disabled={loading}
               />
             </View>
             <View className={isWeb ? "flex-1" : "w-full"}>
@@ -67,6 +103,7 @@ export default function AuthScreen() {
                 title="Admin Ledger" 
                 variant="ghost"
                 onPress={() => navigation.navigate('AdminPanel')} 
+                disabled={loading}
               />
             </View>
           </View>

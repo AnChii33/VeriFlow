@@ -2,12 +2,35 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { hashContent, getTraceData } from './utils/security';
+import { hashPassword, comparePassword } from './utils/security';
 
 const prisma = new PrismaClient();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  const { email, password, role } = req.body;
+
+  try {
+    let user;
+    if (role === 'CLIENT') {
+      user = await prisma.client.findUnique({ where: { email } });
+    } else if (role === 'LEGAL') {
+      user = await prisma.legalReviewer.findUnique({ where: { email } });
+    }
+
+    if (user && await comparePassword(password, user.password)) {
+      // In a production app, return a JWT here
+      res.json({ success: true, userId: user.id, name: user.name });
+    } else {
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
 
 app.post('/api/templates/submit', async (req: Request, res: Response) => {
   const { title, documentType, content, clientId } = req.body;
