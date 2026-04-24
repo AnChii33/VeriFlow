@@ -12,14 +12,27 @@ from dotenv import load_dotenv
 
 
 def get_configuration(dotenv_path):
-    load_dotenv(dotenv_path)
-    embedding_path=os.getenv("embedding_path")
-    embedding_name=os.getenv("embedding_name")
-    sentence_transformer=os.getenv("sentence_transformer")
-    cross_encode_model=os.getenv("cross_encode_model")
-    api_key=os.getenv("api_key")
-    llm_model=os.getenv("llm_model")
-    return embedding_path,embedding_name,sentence_transformer,cross_encode_model,api_key,llm_model
+    # 1. Find the exact folder where this Python script lives
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    exact_env_path = os.path.join(script_dir, ".env")
+    
+    # 2. Load the file
+    print(f"\nDEBUG: Forcing python to read .env from: {exact_env_path}\n")
+    load_dotenv(exact_env_path)
+    
+    # 3. Read the folder name from .env (e.g., "cfr_vectorstore")
+    raw_embd_path = os.getenv("embedding_path")
+    
+    # Make the database path absolute!
+    embedding_path = os.path.join(script_dir, raw_embd_path)
+    
+    embedding_name = os.getenv("embedding_name")
+    sentence_transformer = os.getenv("sentence_transformer")
+    cross_encode_model = os.getenv("cross_encode_model")
+    api_key = os.getenv("api_key")
+    llm_model = os.getenv("llm_model")
+    
+    return embedding_path, embedding_name, sentence_transformer, cross_encode_model, api_key, llm_model
 
 def create_chain(template, llm):
     prompt = PromptTemplate.from_template(template)
