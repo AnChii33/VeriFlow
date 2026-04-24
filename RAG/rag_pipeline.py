@@ -38,7 +38,7 @@ Then, transform those text chunks into descriptive compliance rules that can be 
 
 ### Input
 
-User template: {Insert user query here}
+User template: {template_text}
 
 Document Context: 21 CFR Part 11 (
 Rule 1: Applicability of Electronic Records and Signatures
@@ -103,17 +103,17 @@ Your task is to assess whether a given template adheres to a set of compliance r
 
 ### Context
 Compliance Rules:
-{Insert compliance rules here}
+{context}
 
 Template to Evaluate:
-{Insert template content here}
+{template_text}
 
 ### Instructions
 1. Read the compliance rules carefully.
 2. Analyze the template against each rule.
 3. For each rule, state:
    - Whether the template complies (Yes/No).
-   - A short explanation of why if the template doesnt complies.
+   - A short explanation of why if the template doesnt comply.
 4. Provide an overall compliance verdict:
    - "Compliant" if all rules are met.
    - "Non-Compliant" if any rule is violated.
