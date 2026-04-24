@@ -1,10 +1,19 @@
-import { Platform, Dimensions } from 'react-native';
+import { Platform } from 'react-native';
 
-export const isWeb = Platform.OS === 'web';
-export const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+export const getDeviceTrace = () => {
+  return {
+    os: Platform.OS,
+    version: Platform.Version,
+    isWeb: Platform.OS === 'web'
+  };
+};
 
-// A helper to quickly check if the screen is wide enough for a "dashboard" layout
-export const isLargeScreen = () => {
-  const { width } = Dimensions.get('window');
-  return isWeb && width > 768; // 768px is the standard tablet/laptop breakpoint
+export const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
