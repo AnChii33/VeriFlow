@@ -131,6 +131,7 @@ Template to Evaluate:
    - "Compliant" if all rules are met.
    - "Non-Compliant" if any rule is violated.
 5. Suggest specific improvements if non-compliant.
+6.after understanding the context of the given template to evaluate and compliance issue generate two template suggestion that would be compliant based on the compliance rule.
 
 ### Output Format
 Compliance Evaluation Report:
@@ -139,6 +140,8 @@ Compliance Evaluation Report:
 ...
 - Overall Verdict: [Compliant/Non-Compliant]
 - Recommendations: [List of improvements if needed]
+-Suggested template 1:[first suggestion template generated]
+-Suggested template 2:[second suggestion template generated]
 """
 
 
@@ -186,6 +189,7 @@ def validate_template_pipeline(env_path, template_text):
 
     # Step A: Convert the uploaded text into a targeted search query
     search_query = generate_compliance_query(template_text, llm)
+    print(search_query)
     
     # Step B: Retrieve 21 CFR Part 11 rules from FAISS
     raw_docs = vectorstore.similarity_search(search_query, k=10)
