@@ -26,7 +26,7 @@ def create_chain(template, llm):
     return prompt | llm | StrOutputParser()
 
 CLAUSE_ANALYSIS_TEMPLATE = """
-You are a legal AI assistant. Analyze the following clause from a user-submitted document. 
+You are an legal AI assistant. Analyze the following clause from a user-submitted document. 
 Generate a precise, optimized search query to retrieve the relevant compliance rules from the 21 CFR Part 11 regulatory guidelines.
 Do not answer the query, just generate the search string.
 
@@ -35,7 +35,7 @@ Optimized Search Query:
 """
 
 COMPLIANCE_EVAL_TEMPLATE = """
-You are an expert regulatory auditor specializing in 21 CFR Part 11 compliance. 
+You are expert regulatory auditor specializing in 21 CFR Part 11 compliance. 
 Evaluate the user's template clause against the retrieved regulatory policy context.
 Determine if the template complies with the rules.
 
