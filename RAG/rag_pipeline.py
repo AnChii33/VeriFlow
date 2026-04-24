@@ -28,7 +28,7 @@ def create_chain(template, llm):
 CLAUSE_ANALYSIS_TEMPLATE = """
 You are a compliance rule extraction assistant.
 
-Your task is to analyze the user’s query, understand the compliance context,
+Your task is to analyze given  the user template , understand the compliance context,
 
 and generate a retrieval query to extract relevant text chunks from the CFR Part 11 document.
 
@@ -38,7 +38,7 @@ Then, transform those text chunks into descriptive compliance rules that can be 
 
 ### Input
 
-User Query: {Insert user query here}
+User template: {Insert user query here}
 
 Document Context: 21 CFR Part 11 (
 Rule 1: Applicability of Electronic Records and Signatures
@@ -58,11 +58,11 @@ Rule 11: Training and Accountability
 
 ### Instructions
 
-1. Interpret the user query to identify the compliance domain (e.g., electronic records, electronic signatures, system controls).
+1. Interpret the user template to identify the compliance domain given as document context.
 
 2. Generate a precise retrieval query that can be used to locate relevant text chunks in the CFR Part 11 document.
 
-   - Keep the query concise and focused on the compliance requirement implied by the user query.
+   - Keep the query concise and focused on the compliance requirement implied by the user given template.
 
 3. Extract the relevant text chunks from the CFR document.
 
@@ -113,7 +113,7 @@ Template to Evaluate:
 2. Analyze the template against each rule.
 3. For each rule, state:
    - Whether the template complies (Yes/No).
-   - A short explanation of why.
+   - A short explanation of why if the template doesnt complies.
 4. Provide an overall compliance verdict:
    - "Compliant" if all rules are met.
    - "Non-Compliant" if any rule is violated.
