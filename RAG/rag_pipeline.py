@@ -1,3 +1,5 @@
+import json
+from langchain_core.output_parsers import JsonOutputParser
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -23,96 +25,90 @@ def create_chain(template, llm):
     prompt = PromptTemplate.from_template(template)
     return prompt | llm | StrOutputParser()
 
-REPHRASE_TEMPLATE = """
-Analyze the Conversational history to understand the context. Rewrite the given query into a clear, self-contained, and precise standalone query for efficient retrieval. If history is empty, return the original query.
-History: {history}
-Query: {query}
-Rephrased query:
+CLAUSE_ANALYSIS_TEMPLATE = """
+You are a legal AI assistant. Analyze the following clause from a user-submitted document. 
+Generate a precise, optimized search query to retrieve the relevant compliance rules from the 21 CFR Part 11 regulatory guidelines.
+Do not answer the query, just generate the search string.
+
+Template Clause: {template_text}
+Optimized Search Query:
 """
 
-EXPAND_TEMPLATE = """
-Expand the given user query into {n} semantically similar search queries. Evaluate those queries and return ONLY the best, single optimized query that would perform best for a RAG pipeline.
-Query: {query}
+COMPLIANCE_EVAL_TEMPLATE = """
+You are an expert regulatory auditor specializing in 21 CFR Part 11 compliance. 
+Evaluate the user's template clause against the retrieved regulatory policy context.
+Determine if the template complies with the rules.
+
+Return your analysis STRICTLY as a JSON object with the following keys:
+- "status": Must be exactly "Compliant" or "Requires Review"
+- "title": A short 3-5 word title of the issue (e.g., "Missing Biometric Requirement")
+- "reason": A 1-2 sentence explanation of why it fails or passes based ONLY on the policy context.
+- "suggestion": The exact rewritten text the user should insert to fix the issue (or null if compliant).
+
+Policy Context (21 CFR Part 11 rules):
+{context}
+
+User Template Clause:
+{template_text}
 """
 
-DECOMPOSE_TEMPLATE = """
-Analyze the user query. If it is big and complex, break it into a minimal number of helpful sub-queries for retrieval optimization. Return ONLY the subqueries, one per line.
-Query: {query}
-"""
 
-QNA_TEMPLATE = """
-Generate a meaningful, detailed paragraph answer for the query based ONLY on the provided context. Answer clearly and understandably. Do not use phrases like "based on the context".
-Context: {context}
-Query: {query}
-"""
+# 1. New function to generate the search query from the template
+def generate_compliance_query(template_text, llm):
+    print("Analyzing template clause to generate search query...")
+    clause_chain = create_chain(CLAUSE_ANALYSIS_TEMPLATE, llm)
+    search_query = clause_chain.invoke({"template_text": template_text})
+    return search_query.strip()
 
-
-#main for query optimization
-def query_optimize(useq, chats, llm):
-    qlist = []
+# 2. New function to evaluate the compliance and return JSON for the UI
+def evaluate_compliance(template_text, context, llm):
+    print("Evaluating compliance against 21 CFR Part 11...")
     
-    # 1. Rephrase
-    history_text = "\n".join(f"{item['Query']}: {item['Response']}" for item in chats)
-    rephrase_chain = create_chain(REPHRASE_TEMPLATE, llm)
-    useq = rephrase_chain.invoke({"history": history_text, "query": useq})
+    # We use a custom chain here to force JsonOutputParser
+    prompt = PromptTemplate.from_template(COMPLIANCE_EVAL_TEMPLATE)
+    eval_chain = prompt | llm | JsonOutputParser() 
     
-    # 2. Expand 
-    expand_chain = create_chain(EXPAND_TEMPLATE, llm)
-    useq = expand_chain.invoke({"n": 5, "query": useq})
-    
-    # 3. Decompose
-    decompose_chain = create_chain(DECOMPOSE_TEMPLATE, llm)
-    sub_queries_text = decompose_chain.invoke({"query": useq})
-    
-    # Clean up output
-    qlist.extend([q.strip("- ").strip() for q in sub_queries_text.split("\n") if q.strip()])
-    if not qlist:
-        qlist.append(useq)
-        
-    return qlist, useq # Return BOTH the list of sub-queries and the main optimized query
+    try:
+        # This will return a Python dictionary parsed from the LLM's JSON output
+        result = eval_chain.invoke({
+            "context": context, 
+            "template_text": template_text
+        })
+        return result
+    except Exception as e:
+        print(f"JSON Parsing Error: {e}")
+        return {"status": "Error", "reason": "Failed to generate valid compliance report."}
 
-def query_pipeline(env_path,useq,chats):
-    embd_path,emb_name,sent_model,cross_model,api,llm_mod=get_configuration(env_path)
-
+# 3. How your new pipeline flow looks
+def validate_template_pipeline(env_path, template_text):
+    embd_path, emb_name, sent_model, cross_model, api, llm_mod = get_configuration(env_path)
+    
     llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api)
-
     embeddings = HuggingFaceEmbeddings(model_name=sent_model)
+    
     vectorstore = FAISS.load_local(
        folder_path=embd_path, 
        embeddings=embeddings, 
        index_name=emb_name, 
        allow_dangerous_deserialization=True
-    ) # Required by LangChain to read your .pkl file
-
+    )
     cross_encoder = HuggingFaceCrossEncoder(model_name=cross_model)
-    reranker = CrossEncoderReranker(model=cross_encoder, top_n=10)
+    reranker = CrossEncoderReranker(model=cross_encoder, top_n=5)
 
+    # Step A: Convert the uploaded text into a targeted search query
+    search_query = generate_compliance_query(template_text, llm)
     
-    #Query Optimization
-    query_list, optimized_query = query_optimize(useq,chats,llm)
-
-    all_retrieved_docs = []
-
-    for q in query_list:
-        #retrieving the chunks that are similar to the given query.
-        k=10#int(input("enter the no. of similar chunks to be extracted:"))
-        docs = vectorstore.similarity_search(q, k=5) 
-        all_retrieved_docs.extend(docs)
-
-    unique_docs = {doc.page_content: doc for doc in all_retrieved_docs}.values()
-    print("Reranking documents...")
-    reranked_docs = reranker.compress_documents(list(unique_docs), optimized_query)
-
-    # Join the best chunks into a single context string
-    context = "\n\n".join([doc.page_content for doc in reranked_docs])
+    # Step B: Retrieve 21 CFR Part 11 rules from FAISS
+    raw_docs = vectorstore.similarity_search(search_query, k=10)
     
-    # Create the LangChain Q&A chain and generate the answer
-    qna_chain = create_chain(QNA_TEMPLATE, llm)
+    # Step C: Rerank to get the absolute best policy matches
+    reranked_docs = reranker.compress_documents(raw_docs, search_query)
+    policy_context = "\n\n".join([doc.page_content for doc in reranked_docs])
     
-    print(f"\nGenerating final answer for: {optimized_query}...\n")
-    resp = qna_chain.invoke({"context": context, "query": optimized_query})
+    # Step D: Evaluate and return the JSON payload for your web frontend
+    final_report = evaluate_compliance(template_text, policy_context, llm)
     
-    print(resp)
-    return resp
+    return final_report
+
         
 print("complete!!")
