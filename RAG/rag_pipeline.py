@@ -26,30 +26,106 @@ def create_chain(template, llm):
     return prompt | llm | StrOutputParser()
 
 CLAUSE_ANALYSIS_TEMPLATE = """
-You are an legal AI assistant. Analyze the following clause from a user-submitted document. 
-Generate a precise, optimized search query to retrieve the relevant compliance rules from the 21 CFR Part 11 regulatory guidelines.
-Do not answer the query, just generate the search string.
+You are a compliance rule extraction assistant.
 
-Template Clause: {template_text}
-Optimized Search Query:
+Your task is to analyze the user’s query, understand the compliance context,
+
+and generate a retrieval query to extract relevant text chunks from the CFR Part 11 document.
+
+Then, transform those text chunks into descriptive compliance rules that can be used to evaluate messaging templates.
+
+ 
+
+### Input
+
+User Query: {Insert user query here}
+
+Document Context: 21 CFR Part 11 (
+Rule 1: Applicability of Electronic Records and Signatures
+Rule 2: Scope of Application
+Rule 3: System Validation
+Rule 4: Audit Trails
+Rule 5: Record Retention and Retrieval
+Rule 6: Uniqueness of Electronic Signatures
+Rule 7: Signature Manifestations
+Rule 8: Signature/Record Linking
+Rule 9: Access Control
+Rule 10: Identification Code and Password Security
+Rule 11: Training and Accountability
+)
+
+ 
+
+### Instructions
+
+1. Interpret the user query to identify the compliance domain (e.g., electronic records, electronic signatures, system controls).
+
+2. Generate a precise retrieval query that can be used to locate relevant text chunks in the CFR Part 11 document.
+
+   - Keep the query concise and focused on the compliance requirement implied by the user query.
+
+3. Extract the relevant text chunks from the CFR document.
+
+4. Convert the extracted text into **compliance rules** that are:
+
+   - Clear and descriptive
+
+   - Include rationale/context
+
+   - Define measurable criteria for auditing
+
+5. Organize the rules into categories (General Provisions, Electronic Records, Electronic Signatures, System Controls).
+
+6. Present the output in a structured format.
+
+ 
+
+### Output Format
+
+Retrieval Query: [Generated query for document search]
+
+Relevant Text Chunks: [Extracted CFR text]
+
+Compliance Rules:
+
+- Rule 1: [Detailed rule with rationale and measurable criteria]
+
+- Rule 2: [Detailed rule with rationale and measurable criteria]
+
+...
+
+Categories: [Organized grouping of rules]
 """
 
 COMPLIANCE_EVAL_TEMPLATE = """
-You are expert regulatory auditor specializing in 21 CFR Part 11 compliance. 
-Evaluate the user's template clause against the retrieved regulatory policy context.
-Determine if the template complies with the rules.
+You are an expert compliance evaluator. 
+Your task is to assess whether a given template adheres to a set of compliance rules.
 
-Return your analysis STRICTLY as a JSON object with the following keys:
-- "status": Must be exactly "Compliant" or "Requires Review"
-- "title": A short 3-5 word title of the issue (e.g., "Missing Biometric Requirement")
-- "reason": A 1-2 sentence explanation of why it fails or passes based ONLY on the policy context.
-- "suggestion": The exact rewritten text the user should insert to fix the issue (or null if compliant).
+### Context
+Compliance Rules:
+{Insert compliance rules here}
 
-Policy Context (21 CFR Part 11 rules):
-{context}
+Template to Evaluate:
+{Insert template content here}
 
-User Template Clause:
-{template_text}
+### Instructions
+1. Read the compliance rules carefully.
+2. Analyze the template against each rule.
+3. For each rule, state:
+   - Whether the template complies (Yes/No).
+   - A short explanation of why.
+4. Provide an overall compliance verdict:
+   - "Compliant" if all rules are met.
+   - "Non-Compliant" if any rule is violated.
+5. Suggest specific improvements if non-compliant.
+
+### Output Format
+Compliance Evaluation Report:
+- Rule 1: [Yes/No] – [Explanation]
+- Rule 2: [Yes/No] – [Explanation]
+...
+- Overall Verdict: [Compliant/Non-Compliant]
+- Recommendations: [List of improvements if needed]
 """
 
 
