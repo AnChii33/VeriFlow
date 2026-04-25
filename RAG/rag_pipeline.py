@@ -1,3 +1,4 @@
+import re
 import json
 from langchain_core.output_parsers import JsonOutputParser
 import os
@@ -7,7 +8,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser,JsonOutputParser
 from dotenv import load_dotenv
 
 
@@ -74,8 +75,9 @@ Rule 11: Training and Accountability
 1. Interpret the user template to identify the compliance domain given as document context.
 
 2. Generate a precise retrieval query that can be used to locate relevant text chunks in the CFR Part 11 document.
+   - Retrieval query should ensure that the all the compliance rules that are relevant for analysing the given user template should be retrieved in details.
 
-   - Keep the query concise and focused on the compliance requirement implied by the user given template.
+   - Keep the query should ensure that the retrieved informations are sufficient for the evaluation the user template.
 
 3. Extract the relevant text chunks from the CFR document.
 
@@ -112,7 +114,7 @@ Categories: [Organized grouping of rules]
 
 COMPLIANCE_EVAL_TEMPLATE = """
 You are an expert compliance evaluator. 
-Your task is to assess whether a given template adheres to a set of compliance rules.
+Your task is to assess whether a given template adheres to a set of compliance rules and identify the rules that the template is not compliant to.
 
 ### Context
 Compliance Rules:
@@ -124,24 +126,30 @@ Template to Evaluate:
 ### Instructions
 1. Read the compliance rules carefully.
 2. Analyze the template against each rule.
-3. For each rule, state:
-   - Whether the template complies (Yes/No).
-   - A short explanation of why if the template doesnt comply.
-4. Provide an overall compliance verdict:
-   - "Compliant" if all rules are met.
-   - "Non-Compliant" if any rule is violated.
-5. Suggest specific improvements if non-compliant.
+3. For each rule:
+   - Check whether the template complies with the rules or not.
+   - A detailed explanation of why if the template doesnt comply.
+4. Provide an overall compliance report:
+   - that contains all the rules that are violated or not compliant to along with the explanation of why not compliant if none of the rules are violated or not compliant return NULL
 6.after understanding the context of the given template to evaluate and compliance issue generate two template suggestion that would be compliant based on the compliance rule.
 
-### Output Format
-Compliance Evaluation Report:
-- Rule 1: [Yes/No] – [Explanation]
-- Rule 2: [Yes/No] – [Explanation]
-...
-- Overall Verdict: [Compliant/Non-Compliant]
-- Recommendations: [List of improvements if needed]
--Suggested template 1:[first suggestion template generated]
--Suggested template 2:[second suggestion template generated]
+### Output Format (STRICT JSON ONLY)
+
+Return ONLY valid JSON. No markdown. No bullet points. No explanations outside JSON.
+
+{{
+  "rules": [
+    {{
+      "rule": "11.1 Scope",
+      "status": "NULL"(always),
+      "explanation": "Explain why"
+    }}
+  ],
+  "suggested_templates": [
+    "string",
+    "string"
+  ]
+}}
 """
 
 
@@ -158,7 +166,7 @@ def evaluate_compliance(template_text, context, llm):
     
     # We use a custom chain here to force JsonOutputParser
     prompt = PromptTemplate.from_template(COMPLIANCE_EVAL_TEMPLATE)
-    eval_chain = prompt | llm | JsonOutputParser() 
+    eval_chain = prompt | llm | StrOutputParser()
     
     try:
         # This will return a Python dictionary parsed from the LLM's JSON output
@@ -166,10 +174,49 @@ def evaluate_compliance(template_text, context, llm):
             "context": context, 
             "template_text": template_text
         })
+        #parsed_result=parse_compliance_report(result)
         return result
     except Exception as e:
         print(f"JSON Parsing Error: {e}")
         return {"status": "Error", "reason": "Failed to generate valid compliance report."}
+
+##response generated parsing
+def parse_compliance_report(text):
+    data = {
+        "rules": [],
+        "overall_verdict": None,
+        "recommendations": [],
+        "suggested_templates": []
+    }
+
+    # -------- RULES --------
+    rule_blocks = re.findall(
+        r"\*\*Rule:\s*(.*?)\.\*\*\s*-\s*(Yes|No|N/A)(?:\s*–\s*(.*))?",
+        text
+    )
+    for rule, status, explanation in rule_blocks:
+        data["rules"].append({
+            "rule": rule.strip(),
+            "status": status.strip(),
+            "explanation": explanation.strip() if explanation else ""
+        })
+     # -------- OVERALL VERDICT --------
+    verdict_match = re.search(r"\*\*Overall Verdict:\*\*\s*(.*)", text)
+    if verdict_match:
+        data["overall_verdict"] = verdict_match.group(1).strip()
+
+    # -------- RECOMMENDATIONS --------
+    recs = re.findall(r"\d+\.\s+(.*)", text)
+    data["recommendations"] = recs
+    # -------- SUGGESTED TEMPLATES --------
+    templates = re.findall(
+        r"\*\*Suggested template \d+:\*\*\s*\"(.*?)\"",
+        text,
+        re.DOTALL
+    )
+    data["suggested_templates"] = [t.strip() for t in templates]
+
+    return data
 
 # 3. How your new pipeline flow looks
 def validate_template_pipeline(env_path, template_text):
@@ -200,8 +247,9 @@ def validate_template_pipeline(env_path, template_text):
     
     # Step D: Evaluate and return the JSON payload for your web frontend
     final_report = evaluate_compliance(template_text, policy_context, llm)
-    
     return final_report
+
+
 
         
 # ==========================================
@@ -217,7 +265,7 @@ Click here for my contact card: https://ahins2srtportal.p360connect.biz/USGM838y
     
     # Call your pipeline function
     # Make sure your .env file is in the same directory!
-    report = validate_template_pipeline(".env", sample_clause) 
+    report=validate_template_pipeline(".env", sample_clause) 
     
     print("\n--- FINAL UI JSON PAYLOAD ---")
     print(json.dumps(report, indent=4))
