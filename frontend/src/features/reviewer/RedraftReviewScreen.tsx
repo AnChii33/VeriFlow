@@ -104,6 +104,23 @@ export default function RedraftReviewScreen({ route }: any) {
             </View>
           </View>
 
+          {/* SURGICAL ADDITION: Signatures Display Block */}
+          {template.signatures && template.signatures.length > 0 && (
+            <View className="mb-8">
+              <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Digital Signatures Attached</Text>
+              {template.signatures.map((sig: any) => (
+                <InfoCard key={sig.id} className="mb-3">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1">
+                      <Text className="text-brand-text font-bold text-lg">{sig.printedName}</Text>
+                      <Text className="text-brand-primary text-[10px] uppercase tracking-widest mt-1">{sig.signatureMeaning}</Text>
+                    </View>
+                  </View>
+                </InfoCard>
+              ))}
+            </View>
+          )}
+
           <View className="mb-8">
             <VersionBox 
               label="Submitted Content" 

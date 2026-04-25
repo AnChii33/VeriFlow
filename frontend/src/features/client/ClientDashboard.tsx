@@ -23,7 +23,7 @@ export default function ClientDashboard({ route }: any) {
   const fetchTemplates = async () => {
     try {
       const data = await veriflowApi.getClientTemplates(clientId);
-      setTemplates(data);
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (e) {
       Alert.alert("Error", "Failed to fetch secure records.");
     } finally {
@@ -52,13 +52,13 @@ export default function ClientDashboard({ route }: any) {
     }
   };
 
-  const actionRequiredCount = templates.filter(t => t.status === 'pending_client_action').length;
-  const approvedCount = templates.filter(t => t.status === 'approved').length;
+  const validTemplates = templates || [];
+  const actionRequiredCount = validTemplates.filter(t => t.status === 'pending_client_action').length;
+  const approvedCount = validTemplates.filter(t => t.status === 'approved').length;
 
   return (
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
-      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View>
           <Text className="text-brand-text text-2xl font-black tracking-tighter">Client Terminal</Text>
@@ -82,7 +82,6 @@ export default function ClientDashboard({ route }: any) {
         </View>
       </View>
 
-      {/* Scrollable Content */}
       <ScrollView
         style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false}
@@ -95,20 +94,20 @@ export default function ClientDashboard({ route }: any) {
           ) : (
             <>
               <View className={isWeb ? "flex-row gap-4 mb-8" : "mb-6 gap-y-4"}>
-                <View className="flex-1"><MetricCard label="Total Drafts" value={templates.length} /></View>
+                <View className="flex-1"><MetricCard label="Total Drafts" value={validTemplates.length} /></View>
                 <View className="flex-1"><MetricCard label="Action Required" value={actionRequiredCount} /></View>
                 <View className="flex-1"><MetricCard label="Approved" value={approvedCount} /></View>
               </View>
 
               <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Recent Documents</Text>
 
-              {templates.length === 0 ? (
+              {validTemplates.length === 0 ? (
                 <InfoCard className="items-center py-10">
                   <Text className="text-brand-muted font-bold text-center">No documents found.</Text>
                   <Text className="text-brand-muted text-xs mt-2 text-center">Click "+ New Draft" to submit a document to the system.</Text>
                 </InfoCard>
               ) : (
-                templates.map((doc) => (
+                validTemplates.map((doc) => (
                   <TouchableOpacity 
                     key={doc.id} 
                     activeOpacity={0.8} 

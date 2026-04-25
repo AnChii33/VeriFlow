@@ -22,7 +22,7 @@ export default function ReviewerDashboard({ route }: any) {
   const fetchQueue = async () => {
     try {
       const data = await veriflowApi.getLegalQueue();
-      setQueue(data);
+      setQueue(Array.isArray(data) ? data : []);
     } catch (e) {
       Alert.alert("Error", "Failed to fetch the review queue.");
     } finally {
@@ -47,14 +47,13 @@ export default function ReviewerDashboard({ route }: any) {
     navigation.navigate('RedraftReviewScreen', { template, reviewerId });
   };
 
-  const totalFlags = queue.reduce((acc, doc) => acc + (doc.flags?.length || 0), 0);
-  const uniqueClients = new Set(queue.map(doc => doc.clientId)).size;
+  const validQueue = queue || [];
+  const totalFlags = validQueue.reduce((acc, doc) => acc + (doc.flags?.length || 0), 0);
+  const uniqueClients = new Set(validQueue.map(doc => doc.clientId)).size;
 
   return (
-    // FIX: Root View strictly fills screen and forces hidden overflow
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
-      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View>
           <Text className="text-brand-text text-2xl font-black tracking-tighter">Legal Terminal</Text>
@@ -71,7 +70,6 @@ export default function ReviewerDashboard({ route }: any) {
         />
       </View>
 
-      {/* FIX: ScrollView with hardcoded flex and web overflow */}
       <ScrollView
         style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false}
@@ -84,20 +82,20 @@ export default function ReviewerDashboard({ route }: any) {
           ) : (
             <>
               <View className={isWeb ? "flex-row gap-4 mb-8" : "mb-6 gap-y-4"}>
-                <View className="flex-1"><MetricCard label="Pending Review" value={queue.length} /></View>
+                <View className="flex-1"><MetricCard label="Pending Review" value={validQueue.length} /></View>
                 <View className="flex-1"><MetricCard label="Total Flags" value={totalFlags} /></View>
                 <View className="flex-1"><MetricCard label="Clients Awaiting" value={uniqueClients} /></View>
               </View>
 
               <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Active Queue</Text>
 
-              {queue.length === 0 ? (
+              {validQueue.length === 0 ? (
                 <InfoCard className="items-center py-10">
                   <Text className="text-brand-muted font-bold text-center">The queue is currently empty.</Text>
                   <Text className="text-brand-muted text-xs mt-2 text-center">All submitted documents have been processed.</Text>
                 </InfoCard>
               ) : (
-                queue.map((doc) => (
+                validQueue.map((doc) => (
                   <TouchableOpacity 
                     key={doc.id} 
                     activeOpacity={0.8} 

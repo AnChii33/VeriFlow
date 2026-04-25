@@ -237,6 +237,7 @@ app.post('/api/client/respond/:id', async (req: Request, res: Response) => {
   const id = ensureString(req.params.id);
   const action = ensureString(req.body.action);
   const manualContent = ensureString(req.body.manualContent);
+  const selectedRedraftId = ensureString(req.body.selectedRedraftId); // <-- NEW
   const { ip, ua } = getSafeTrace(req);
 
   try {
@@ -247,11 +248,41 @@ app.post('/api/client/respond/:id', async (req: Request, res: Response) => {
 
     const result = await prisma.$transaction(async (tx) => {
       if (action === 'ACCEPT') {
-        const latestRedraft = await tx.redraftedTemplate.findFirst({
-          where: { templateId: id }, orderBy: { createdAt: 'desc' }
+        // 1. Mark all existing redrafts for this template as rejected
+        await tx.redraftedTemplate.updateMany({
+          where: { templateId: id },
+          data: { status: 'rejected' }
         });
 
-        const finalContent = latestRedraft?.modContent || template.content;
+        let finalContent = template.content;
+
+        // 2. Mark the selected redraft as accepted and get its content
+        if (selectedRedraftId) {
+          await tx.redraftedTemplate.update({
+            where: { id: selectedRedraftId },
+            data: { status: 'accepted' }
+          });
+
+          const chosenRedraft = await tx.redraftedTemplate.findUnique({
+            where: { id: selectedRedraftId }
+          });
+          
+          if (chosenRedraft) {
+            finalContent = chosenRedraft.modContent;
+          }
+        } else {
+          // Fallback if no specific ID was sent (grabs latest)
+          const latestRedraft = await tx.redraftedTemplate.findFirst({
+            where: { templateId: id }, orderBy: { createdAt: 'desc' }
+          });
+          if (latestRedraft) {
+            await tx.redraftedTemplate.update({
+              where: { id: latestRedraft.id },
+              data: { status: 'accepted' }
+            });
+            finalContent = latestRedraft.modContent;
+          }
+        }
 
         const updated = await tx.template.update({
           where: { id }, data: { status: 'approved', content: finalContent }
@@ -274,7 +305,15 @@ app.post('/api/client/respond/:id', async (req: Request, res: Response) => {
           });
         }
         return updated;
+
       } else {
+        // RE_SUBMIT ACTION (Manual Override)
+        // 1. Mark all existing redrafts as rejected since client is overriding
+        await tx.redraftedTemplate.updateMany({
+          where: { templateId: id },
+          data: { status: 'rejected' }
+        });
+
         const updated = await tx.template.update({
           where: { id }, data: { content: manualContent, status: 'pending_ai_flags' }
         });
@@ -477,7 +516,8 @@ app.get('/api/legal/queue', async (req: Request, res: Response) => {
       include: { 
         flags: true,
         client: { include: { company: true } }, 
-        reviewer: true
+        reviewer: true,
+        signatures: true
       },
       orderBy: { updatedAt: 'asc' }
     });
