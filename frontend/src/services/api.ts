@@ -99,6 +99,14 @@ export const veriflowApi = {
     return res.json();
   },
 
+  deleteCompany: async (id: string) => {
+    const res = await fetch(`${API_BASE}/admin/companies/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete company');
+    return res.json();
+  },
+
   getUsers: async () => {
     const res = await fetch(`${API_BASE}/admin/users`);
     if (!res.ok) throw new Error('Failed to fetch users');

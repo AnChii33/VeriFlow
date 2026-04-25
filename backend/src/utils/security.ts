@@ -1,14 +1,27 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
-
-export const generateRoleId = (role: 'CLIENT' | 'LEGAL_REVIEWER' | 'ADMIN') => {
-  const prefix = role === 'CLIENT' ? 'C' : role === 'LEGAL_REVIEWER' ? 'L' : 'A';
-  return `${prefix}-${uuidv4()}`;
-};
 
 export const hashContent = (content: string): string => {
   return crypto.createHash('sha256').update(content).digest('hex');
+};
+
+export const generateRoleId = (role: 'CLIENT' | 'LEGAL_REVIEWER' | 'ADMIN'): string => {
+  // 1. Determine the prefix
+  let prefix = 'A';
+  if (role === 'CLIENT') prefix = 'C';
+  if (role === 'LEGAL_REVIEWER') prefix = 'L';
+
+  // 2. Get the current timestamp in milliseconds and convert to Base36
+  // Base36 uses 0-9 and A-Z, making it much shorter than a standard number.
+  // This ensures the IDs are always sequential when sorted alphabetically.
+  const timestamp = Date.now().toString(36).toUpperCase();
+
+  // 3. Generate 4 characters of cryptographic randomness
+  // This prevents collisions if two users are created in the exact same millisecond.
+  const randomPart = crypto.randomBytes(2).toString('hex').toUpperCase();
+
+  // 4. Combine them into the final short ID
+  return `${prefix}-${timestamp}-${randomPart}`;
 };
 
 export const getTraceData = (req: any) => {

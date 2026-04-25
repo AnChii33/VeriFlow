@@ -1,6 +1,6 @@
 // src/features/admin/AuditTrailScreen.tsx
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import InfoCard from '../../components/layout/InfoCard';
 import StatusBadge from '../../components/base/StatusBadge';
@@ -11,6 +11,7 @@ import { getDeviceTrace } from '../../utils/platform';
 
 export default function AuditTrailScreen({ route }: any) {
   const navigation = useNavigation<any>();
+  const { height: screenHeight } = useWindowDimensions();
   const { isWeb } = getDeviceTrace();
   
   const { template } = route.params;
@@ -35,33 +36,35 @@ export default function AuditTrailScreen({ route }: any) {
 
   if (!template) {
     return (
-      <View className="flex-1 bg-brand-dark items-center justify-center">
+      <View style={{ height: screenHeight, backgroundColor: '#080808', justifyContent: 'center', alignItems: 'center' }}>
         <Text className="text-brand-danger font-bold">No template data provided.</Text>
         <AppButton title="Go Back" onPress={() => navigation.goBack()} className="mt-4 w-40" />
       </View>
     );
   }
 
-  const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center py-10" 
-    : "flex-1 bg-brand-dark";
-
-  const contentStyle = isWeb 
-    ? "w-full max-w-4xl px-6" 
-    : "w-full px-4 pt-6";
-
   return (
-    <View className={containerStyle}>
-      <View className={contentStyle}>
-        
-        <View className="flex-row items-center justify-between mb-6">
-          <TouchableOpacity onPress={() => navigation.goBack()} className="bg-brand-card p-3 rounded-xl border border-brand-border">
-            <Text className="text-brand-primary text-xs font-black uppercase tracking-widest">← Back to Ledger</Text>
-          </TouchableOpacity>
-          <StatusBadge status={template.status} />
-        </View>
+    // FIX: Root View strictly fills screen and forces hidden overflow
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      
+      {/* Fixed Header */}
+      <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row items-center justify-between">
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          className="bg-brand-dark px-4 py-2 rounded-xl border border-brand-border"
+        >
+          <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest">← Back to Ledger</Text>
+        </TouchableOpacity>
+        <StatusBadge status={template.status} />
+      </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
+      {/* FIX: ScrollView with hardcoded flex and web overflow */}
+      <ScrollView 
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ padding: isWeb ? 32 : 16, paddingBottom: 100 }}
+      >
+        <View className={isWeb ? "w-full max-w-4xl mx-auto" : "w-full"}>
           
           <InfoCard className="mb-8">
             <Text className="text-brand-text text-3xl font-black tracking-tighter mb-2">{template.title}</Text>
@@ -88,7 +91,6 @@ export default function AuditTrailScreen({ route }: any) {
             <VersionBox label="Active Content" content={template.content} isActive={true} />
           </View>
 
-          {/* Unified Timeline */}
           <Text className="text-brand-text text-xl font-black tracking-tighter mb-6 px-2">System Audit Trail</Text>
           <InfoCard>
             {timelineEvents.map((event, index) => {
@@ -96,7 +98,7 @@ export default function AuditTrailScreen({ route }: any) {
               const dateObj = new Date(event.timestamp);
 
               return (
-                <TimelineStep key={event.id} isLast={isLast}>
+                <TimelineStep key={event.id || index} isLast={isLast}>
                   <View className="bg-brand-dark p-4 rounded-2xl border border-brand-border">
                     <View className="flex-row justify-between mb-2">
                       <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest">
@@ -113,7 +115,7 @@ export default function AuditTrailScreen({ route }: any) {
                       <>
                         <Text className="text-brand-text font-bold text-base mb-1">{event.details}</Text>
                         <Text className="text-brand-muted text-xs">
-                          Actor: {event.actorType} ({event.actorId.substring(0, 8)}...)
+                          Actor: {event.actorType} ({event.actorId})
                         </Text>
                       </>
                     ) : (
@@ -126,7 +128,7 @@ export default function AuditTrailScreen({ route }: any) {
                           IP Trace: {event.ipAddress || 'Unknown'}
                         </Text>
                         <Text className="text-brand-primary/50 text-[10px] mt-2 font-mono">
-                          Hash: {event.documentHash.substring(0, 32)}...
+                          Hash: {event.documentHash}...
                         </Text>
                       </>
                     )}
@@ -140,8 +142,8 @@ export default function AuditTrailScreen({ route }: any) {
             )}
           </InfoCard>
 
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }

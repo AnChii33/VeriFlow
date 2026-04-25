@@ -1,6 +1,6 @@
 // src/features/client/RedraftAction.tsx
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
 import { getDeviceTrace } from '../../utils/platform';
@@ -12,10 +12,10 @@ import StatusBadge from '../../components/base/StatusBadge';
 
 export default function RedraftAction({ route }: any) {
   const navigation = useNavigation<any>();
+  const { height: screenHeight } = useWindowDimensions();
   const { template, clientId } = route.params;
   const { isWeb } = getDeviceTrace();
 
-  // Find the most recent redraft from the array
   const latestRedraft = useMemo(() => {
     if (!template.redrafts || template.redrafts.length === 0) return null;
     return [...template.redrafts].sort((a, b) => 
@@ -52,12 +52,11 @@ export default function RedraftAction({ route }: any) {
     }
   };
 
-  const containerStyle = "flex-1 bg-brand-dark";
-  const contentStyle = isWeb ? "w-full max-w-6xl mx-auto p-8" : "p-4 pt-8";
-
   return (
-    <View className={containerStyle}>
-      {/* Header */}
+    // FIX: Root View strictly fills screen and forces hidden overflow
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      
+      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View className="flex-1 pr-4">
           <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
@@ -75,15 +74,19 @@ export default function RedraftAction({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View className={contentStyle}>
+      {/* FIX: ScrollView with hardcoded flex and web overflow */}
+      <ScrollView 
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ padding: isWeb ? 32 : 16, paddingBottom: 100 }}
+      >
+        <View className={isWeb ? "w-full max-w-6xl mx-auto" : "w-full"}>
           
           <View className="flex-row items-center justify-between mb-6 px-2">
             <Text className="text-brand-text text-xl font-black tracking-tighter">Document Revision</Text>
             <StatusBadge status={template.status} />
           </View>
 
-          {/* Comparison Area */}
           <View className={isWeb ? "flex-row gap-6 mb-8" : "mb-8 gap-y-4"}>
             <View className="flex-1">
               <VersionBox 
@@ -101,7 +104,6 @@ export default function RedraftAction({ route }: any) {
             </View>
           </View>
 
-          {/* Action Area */}
           <InfoCard>
             {!isManualEdit ? (
               <View>
@@ -154,7 +156,7 @@ export default function RedraftAction({ route }: any) {
                       variant="ghost"
                       onPress={() => {
                         setIsManualEdit(false);
-                        setManualText(proposedContent); // Reset text
+                        setManualText(proposedContent); 
                       }} 
                     />
                   </View>
