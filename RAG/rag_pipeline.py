@@ -219,7 +219,7 @@ def generate_compliant_suggestions(original_template, violations_report, llm):
 def validate_template_pipeline(env_path, template_text):
     embd_path, emb_name, sent_model, cross_model, api, llm_mod = get_configuration(env_path)
     
-    llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api, temperature=2)
+    llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api, temperature=0)
     embeddings = HuggingFaceEmbeddings(model_name=sent_model)
     
     vectorstore = FAISS.load_local(
@@ -229,14 +229,14 @@ def validate_template_pipeline(env_path, template_text):
        allow_dangerous_deserialization=True
     )
     cross_encoder = HuggingFaceCrossEncoder(model_name=cross_model)
-    reranker = CrossEncoderReranker(model=cross_encoder, top_n=5)
+    reranker = CrossEncoderReranker(model=cross_encoder, top_n=20)
 
     # Step A: Convert the uploaded text into a targeted search query
     search_query = generate_compliance_query(template_text, llm)
     print(search_query)
     
     # Step B: Retrieve 21 CFR Part 11 rules from FAISS
-    raw_docs = vectorstore.similarity_search(search_query, k=10)
+    raw_docs = vectorstore.similarity_search(search_query, k=20)
     
     # Step C: Rerank to get the absolute best policy matches
     reranked_docs = reranker.compress_documents(raw_docs, search_query)
@@ -274,4 +274,4 @@ Click here for my contact card: https://ahins2srtportal.p360connect.biz/USGM838y
     report=validate_template_pipeline(".env", sample_clause) 
     
     print("\n--- FINAL UI JSON PAYLOAD ---")
-    print(json.dumps(report, indent=4))
+    print(json.dumps(report, indent=4, ensure_ascii=False))
