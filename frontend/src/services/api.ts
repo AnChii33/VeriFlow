@@ -49,11 +49,11 @@ export const veriflowApi = {
     return res.json();
   },
 
-  respondToRedraft: async (id: string, action: 'ACCEPT' | 'RE_SUBMIT', manualContent?: string) => {
+  respondToRedraft: async (id: string, action: 'ACCEPT' | 'RE_SUBMIT', manualContent?: string, selectedRedraftId?: string) => {
     const res = await fetch(`${API_BASE}/client/respond/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, manualContent })
+      body: JSON.stringify({ action, manualContent, selectedRedraftId })
     });
     if (!res.ok) throw new Error('Response failed');
     return res.json();

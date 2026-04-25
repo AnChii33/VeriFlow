@@ -1,5 +1,4 @@
-// src/features/client/RedraftAction.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
@@ -13,24 +12,35 @@ import StatusBadge from '../../components/base/StatusBadge';
 export default function RedraftAction({ route }: any) {
   const navigation = useNavigation<any>();
   const { height: screenHeight } = useWindowDimensions();
-  const { template, clientId } = route.params;
+  const { template } = route.params;
   const { isWeb } = getDeviceTrace();
 
-  const latestRedraft = useMemo(() => {
-    if (!template.redrafts || template.redrafts.length === 0) return null;
-    return [...template.redrafts].sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )[0];
+  const [loading, setLoading] = useState(false);
+  const [selection, setSelection] = useState<string>(''); 
+  const [manualText, setManualText] = useState(template.content);
+
+  useEffect(() => {
+    if (template.redrafts && template.redrafts.length > 0) {
+      setSelection(template.redrafts[0].id);
+    } else {
+      setSelection('manual');
+    }
   }, [template]);
 
-  const proposedContent = latestRedraft?.modContent || 'No AI modifications found.';
+  const cleanMarkdown = (text: string) => {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/_(.*?)_/g, '$1')
+      .replace(/^#+\s/gm, '');
+  };
 
-  const [loading, setLoading] = useState(false);
-  const [isManualEdit, setIsManualEdit] = useState(false);
-  const [manualText, setManualText] = useState(proposedContent);
+  const handleAction = async () => {
+    const isManual = selection === 'manual';
 
-  const handleAction = async (actionType: 'ACCEPT' | 'RE_SUBMIT') => {
-    if (actionType === 'RE_SUBMIT' && !manualText.trim()) {
+    if (isManual && !manualText.trim()) {
       Alert.alert("Validation", "Manual edit content cannot be empty.");
       return;
     }
@@ -39,13 +49,19 @@ export default function RedraftAction({ route }: any) {
     try {
       await veriflowApi.respondToRedraft(
         template.id, 
-        actionType, 
-        actionType === 'RE_SUBMIT' ? manualText : undefined
+        isManual ? 'RE_SUBMIT' : 'ACCEPT', 
+        isManual ? manualText : undefined,
+        isManual ? undefined : selection
       );
-      
-      Alert.alert("Success", "Your decision has been logged.");
+
+      Alert.alert(
+        "Success", 
+        isManual 
+          ? "Your manual revision has been sent to the AI for compliance check." 
+          : "Template successfully updated to the compliant version."
+      );
       navigation.goBack();
-    } catch (e: any) {
+    } catch(e: any) {
       Alert.alert("Submission Failed", e.message || "Could not process your request.");
     } finally {
       setLoading(false);
@@ -53,10 +69,8 @@ export default function RedraftAction({ route }: any) {
   };
 
   return (
-    // FIX: Root View strictly fills screen and forces hidden overflow
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
-      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View className="flex-1 pr-4">
           <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
@@ -74,7 +88,6 @@ export default function RedraftAction({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* FIX: ScrollView with hardcoded flex and web overflow */}
       <ScrollView 
         style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false} 
@@ -87,53 +100,62 @@ export default function RedraftAction({ route }: any) {
             <StatusBadge status={template.status} />
           </View>
 
-          <View className={isWeb ? "flex-row gap-6 mb-8" : "mb-8 gap-y-4"}>
-            <View className="flex-1">
-              <VersionBox 
-                label="Original Submission" 
-                content={template.content} 
-                isActive={false} 
-              />
-            </View>
-            <View className="flex-1">
-              <VersionBox 
-                label="System Proposed Redraft" 
-                content={proposedContent} 
-                isActive={true} 
-              />
-            </View>
+          <View className="mb-8">
+            <VersionBox 
+              label="Original Violating Content" 
+              content={template.content} 
+              isActive={false} 
+            />
           </View>
 
-          <InfoCard>
-            {!isManualEdit ? (
-              <View>
-                <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Decision Required</Text>
-                <Text className="text-brand-muted text-sm leading-6 mb-8">
-                  The system has identified necessary changes to your draft. You may accept the exact proposed text above, or choose to modify it yourself for another review cycle.
-                </Text>
-                
-                <View className={isWeb ? "flex-row gap-4" : "gap-4"}>
-                  <View className={isWeb ? "flex-1" : "w-full"}>
-                    <AppButton 
-                      title="Accept System Redraft" 
-                      variant="success"
-                      loading={loading}
-                      onPress={() => handleAction('ACCEPT')} 
-                    />
-                  </View>
-                  <View className={isWeb ? "flex-1" : "w-full"}>
-                    <AppButton 
-                      title="I want to edit manually" 
-                      variant="ghost"
-                      onPress={() => setIsManualEdit(true)} 
-                    />
+          <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Select Compliant Version</Text>
+
+          {template.redrafts?.map((rd: any, idx: number) => {
+            const isSelected = selection === rd.id;
+            return (
+              <TouchableOpacity 
+                key={rd.id}
+                activeOpacity={0.8}
+                onPress={() => setSelection(rd.id)}
+                className={`mb-4 rounded-xl border overflow-hidden ${isSelected ? 'border-brand-primary' : 'border-brand-border'}`}
+              >
+                <View className={`px-4 py-3 flex-row items-center justify-between border-b ${isSelected ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-brand-dark border-brand-border'}`}>
+                  <Text className={`text-[10px] font-black uppercase tracking-widest ${isSelected ? 'text-brand-primary' : 'text-brand-muted'}`}>
+                    AI Suggestion {idx + 1}
+                  </Text>
+                  <View className={`w-4 h-4 rounded-full border ${isSelected ? 'border-brand-primary items-center justify-center' : 'border-brand-border'}`}>
+                    {isSelected && <View className="w-2 h-2 rounded-full bg-brand-primary" />}
                   </View>
                 </View>
+                <View className="p-4 bg-brand-card">
+                  <Text className="text-brand-text leading-6 text-sm">
+                    {cleanMarkdown(rd.modContent)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => setSelection('manual')}
+            className={`mb-8 rounded-xl border overflow-hidden ${selection === 'manual' ? 'border-brand-primary' : 'border-brand-border'}`}
+          >
+            <View className={`px-4 py-3 flex-row items-center justify-between border-b ${selection === 'manual' ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-brand-dark border-brand-border'}`}>
+              <Text className={`text-[10px] font-black uppercase tracking-widest ${selection === 'manual' ? 'text-brand-primary' : 'text-brand-muted'}`}>
+                Manual Revision
+              </Text>
+              <View className={`w-4 h-4 rounded-full border ${selection === 'manual' ? 'border-brand-primary items-center justify-center' : 'border-brand-border'}`}>
+                {selection === 'manual' && <View className="w-2 h-2 rounded-full bg-brand-primary" />}
               </View>
-            ) : (
-              <View>
-                <Text className="text-brand-text text-lg font-black tracking-tight mb-4">Manual Override</Text>
-                
+            </View>
+            
+            <View className="p-4 bg-brand-card">
+              <Text className="text-brand-muted text-xs mb-4">
+                Reject the AI suggestions and write your own compliant version. This will restart the AI regulatory scan.
+              </Text>
+              
+              {selection === 'manual' && (
                 <InputField 
                   label="Edit Content"
                   value={manualText}
@@ -141,28 +163,23 @@ export default function RedraftAction({ route }: any) {
                   multiline
                   numberOfLines={isWeb ? 12 : 8}
                 />
-                
-                <View className={isWeb ? "flex-row gap-4 mt-4" : "gap-4 mt-4"}>
-                  <View className={isWeb ? "flex-1" : "w-full"}>
-                    <AppButton 
-                      title="Submit for Re-Analysis" 
-                      loading={loading}
-                      onPress={() => handleAction('RE_SUBMIT')} 
-                    />
-                  </View>
-                  <View className={isWeb ? "flex-1" : "w-full"}>
-                    <AppButton 
-                      title="Cancel Override" 
-                      variant="ghost"
-                      onPress={() => {
-                        setIsManualEdit(false);
-                        setManualText(proposedContent); 
-                      }} 
-                    />
-                  </View>
-                </View>
-              </View>
-            )}
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <InfoCard className="mb-8">
+            <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Finalize Decision</Text>
+            <Text className="text-brand-muted text-sm leading-6 mb-6">
+              {selection === 'manual' 
+                ? "Submitting a manual revision will discard the AI suggestions and resubmit your new text for compliance analysis."
+                : "Accepting an AI suggestion will finalize the document and update it in the secure ledger as compliant."}
+            </Text>
+            <AppButton 
+              title={selection === 'manual' ? "Submit Revision for Check" : "Accept Selected Draft"}
+              onPress={handleAction}
+              loading={loading}
+              variant={selection === 'manual' ? "primary" : "success"}
+            />
           </InfoCard>
 
         </View>
