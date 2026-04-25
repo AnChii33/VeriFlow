@@ -1,3 +1,4 @@
+// src/features/reviewer/RedraftReviewScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -15,16 +16,23 @@ export default function RedraftReviewScreen({ route }: any) {
   const { isWeb } = getDeviceTrace();
 
   const [loading, setLoading] = useState(false);
+  
+  /**
+   * NEW: Track decisions for each flag.
+   * Format: { [flagId]: 'confirmed' | 'ignored' }
+   */
   const [decisions, setDecisions] = useState<Record<string, 'confirmed' | 'ignored'>>({});
 
   const flags = template.flags || [];
   const hasFlags = flags.length > 0;
 
+  // Helper to update decision state for a specific flag
   const toggleFlagDecision = (flagId: string, status: 'confirmed' | 'ignored') => {
     setDecisions(prev => ({ ...prev, [flagId]: status }));
   };
 
   const handleDecision = async () => {
+    // Validation: Ensure every flag has a decision before submitting
     if (hasFlags && Object.keys(decisions).length < flags.length) {
       Alert.alert("Action Required", "Please provide a decision (Confirm or Ignore) for every system flag before signing.");
       return;
@@ -32,6 +40,10 @@ export default function RedraftReviewScreen({ route }: any) {
 
     setLoading(true);
     try {
+      /**
+       * UPDATED: Now passes the 'decisions' object to the API.
+       * The backend will use this to update individual flag statuses.
+       */
       await veriflowApi.submitReviewDecision(template.id, reviewerId, decisions);
       Alert.alert("Success", "Your review decisions have been recorded securely.");
       navigation.goBack(); 
@@ -45,6 +57,7 @@ export default function RedraftReviewScreen({ route }: any) {
   return (
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
+      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View className="flex-1 pr-4">
           <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
@@ -91,26 +104,6 @@ export default function RedraftReviewScreen({ route }: any) {
             </View>
           </View>
 
-          {template.signatures && template.signatures.length > 0 && (
-            <View className="mb-8">
-              <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Digital Signatures Attached</Text>
-              {template.signatures.map((sig: any) => (
-                <InfoCard key={sig.id} className="mb-3">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1">
-                      <Text className="text-brand-text font-bold text-lg">{sig.printedName}</Text>
-                      <Text className="text-brand-primary text-[10px] uppercase tracking-widest mt-1">{sig.signatureMeaning}</Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-brand-muted text-[10px] uppercase tracking-widest mb-1">Signed At</Text>
-                      <Text className="text-brand-muted text-xs">{new Date(sig.signedAt).toLocaleDateString()} {new Date(sig.signedAt).toLocaleTimeString()}</Text>
-                    </View>
-                  </View>
-                </InfoCard>
-              ))}
-            </View>
-          )}
-
           <View className="mb-8">
             <VersionBox 
               label="Submitted Content" 
@@ -138,6 +131,7 @@ export default function RedraftReviewScreen({ route }: any) {
                       {flag.explanation}
                     </Text>
 
+                    {/* INTERACTIVE CONTROLS FOR REVIEWER */}
                     <View className="flex-row gap-3">
                       <TouchableOpacity 
                         onPress={() => toggleFlagDecision(flag.id, 'confirmed')}
