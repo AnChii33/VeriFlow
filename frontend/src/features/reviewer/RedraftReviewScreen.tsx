@@ -16,14 +16,36 @@ export default function RedraftReviewScreen({ route }: any) {
   const { isWeb } = getDeviceTrace();
 
   const [loading, setLoading] = useState(false);
+  
+  /**
+   * NEW: Track decisions for each flag.
+   * Format: { [flagId]: 'confirmed' | 'ignored' }
+   */
+  const [decisions, setDecisions] = useState<Record<string, 'confirmed' | 'ignored'>>({});
 
-  const hasFlags = template.flags && template.flags.length > 0;
+  const flags = template.flags || [];
+  const hasFlags = flags.length > 0;
+
+  // Helper to update decision state for a specific flag
+  const toggleFlagDecision = (flagId: string, status: 'confirmed' | 'ignored') => {
+    setDecisions(prev => ({ ...prev, [flagId]: status }));
+  };
 
   const handleDecision = async () => {
+    // Validation: Ensure every flag has a decision before submitting
+    if (hasFlags && Object.keys(decisions).length < flags.length) {
+      Alert.alert("Action Required", "Please provide a decision (Confirm or Ignore) for every system flag before signing.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await veriflowApi.submitReviewDecision(template.id, reviewerId);
-      Alert.alert("Success", "Your review decision has been recorded securely.");
+      /**
+       * UPDATED: Now passes the 'decisions' object to the API.
+       * The backend will use this to update individual flag statuses.
+       */
+      await veriflowApi.submitReviewDecision(template.id, reviewerId, decisions);
+      Alert.alert("Success", "Your review decisions have been recorded securely.");
       navigation.goBack(); 
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to submit review.");
@@ -33,7 +55,6 @@ export default function RedraftReviewScreen({ route }: any) {
   };
 
   return (
-    // FIX: Root View strictly fills screen and forces hidden overflow
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
       {/* Fixed Header */}
@@ -54,7 +75,6 @@ export default function RedraftReviewScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* FIX: ScrollView with hardcoded flex and web overflow */}
       <ScrollView 
         style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false} 
@@ -95,19 +115,45 @@ export default function RedraftReviewScreen({ route }: any) {
           <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">System Flags</Text>
           <InfoCard className="mb-8">
             {hasFlags ? (
-              template.flags.map((flag: any, index: number) => (
-                <View key={flag.id || index} className={`p-4 bg-brand-dark rounded-xl border border-brand-danger/30 ${index !== template.flags.length - 1 ? 'mb-4' : ''}`}>
-                  <View className="flex-row items-center mb-2">
-                    <View className="w-2 h-2 rounded-full bg-brand-danger mr-2" />
-                    <Text className="text-brand-danger text-xs font-black uppercase tracking-widest">
-                      Section: {flag.cfr_section}
+              flags.map((flag: any, index: number) => {
+                const isConfirmed = decisions[flag.id] === 'confirmed';
+                const isIgnored = decisions[flag.id] === 'ignored';
+
+                return (
+                  <View key={flag.id || index} className={`p-4 bg-brand-dark rounded-xl border border-brand-border ${index !== flags.length - 1 ? 'mb-4' : ''}`}>
+                    <View className="flex-row items-center mb-2">
+                      <View className="w-2 h-2 rounded-full bg-brand-danger mr-2" />
+                      <Text className="text-brand-danger text-xs font-black uppercase tracking-widest">
+                        Section: {flag.cfr_section}
+                      </Text>
+                    </View>
+                    <Text className="text-brand-text text-sm leading-6 mb-4">
+                      {flag.explanation}
                     </Text>
+
+                    {/* INTERACTIVE CONTROLS FOR REVIEWER */}
+                    <View className="flex-row gap-3">
+                      <TouchableOpacity 
+                        onPress={() => toggleFlagDecision(flag.id, 'confirmed')}
+                        className={`flex-1 py-3 rounded-lg border flex-row justify-center items-center ${isConfirmed ? 'bg-brand-danger border-brand-danger' : 'bg-transparent border-brand-border'}`}
+                      >
+                        <Text className={`text-[10px] font-black uppercase tracking-widest ${isConfirmed ? 'text-white' : 'text-brand-muted'}`}>
+                          Confirm Violation
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        onPress={() => toggleFlagDecision(flag.id, 'ignored')}
+                        className={`flex-1 py-3 rounded-lg border flex-row justify-center items-center ${isIgnored ? 'bg-brand-success border-brand-success' : 'bg-transparent border-brand-border'}`}
+                      >
+                        <Text className={`text-[10px] font-black uppercase tracking-widest ${isIgnored ? 'text-white' : 'text-brand-muted'}`}>
+                          Ignore / False Positive
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <Text className="text-brand-text text-sm leading-6">
-                    {flag.explanation}
-                  </Text>
-                </View>
-              ))
+                );
+              })
             ) : (
               <View className="py-6 items-center">
                 <Text className="text-brand-success font-bold text-lg mb-1">No Issues Detected</Text>
@@ -117,15 +163,15 @@ export default function RedraftReviewScreen({ route }: any) {
           </InfoCard>
 
           <InfoCard className="mb-12">
-            <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Reviewer Decision</Text>
+            <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Final Certification</Text>
             <Text className="text-brand-muted text-sm leading-6 mb-6">
               {hasFlags 
-                ? "By confirming these flags, the document will be sent back to the system for an automated redraft to resolve the issues." 
+                ? "Submitting this review will process your decisions. Confirmed flags will trigger an automated redraft request, while ignored flags will be cleared from the record." 
                 : "As no flags were detected, signing this will fully approve the document and finalize it in the secure ledger."}
             </Text>
             
             <AppButton 
-              title={hasFlags ? "Confirm Flags & Request Redraft" : "Sign & Approve Document"} 
+              title={hasFlags ? "Certify Decisions & Process" : "Sign & Approve Document"} 
               variant={hasFlags ? "primary" : "success"}
               loading={loading}
               onPress={handleDecision} 

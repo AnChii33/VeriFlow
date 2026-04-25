@@ -1,7 +1,7 @@
 // src/services/api.ts
 import { Platform } from 'react-native';
 
-// 👇 DROP YOUR SPECIFIC IP ADDRESS HERE (e.g., '192.168.1.45')
+// DROP YOUR SPECIFIC IP ADDRESS HERE (e.g., '192.168.1.45')
 const PHYSICAL_IP = '192.168.0.149'; 
 
 const getApiBase = () => {
@@ -18,7 +18,7 @@ const getApiBase = () => {
   return `http://${PHYSICAL_IP !== '192.168.0.149' ? PHYSICAL_IP : 'localhost'}:3000/api`;
 };
 
-const API_BASE = getApiBase();
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || getApiBase();
 
 export const veriflowApi = {
   // --- AUTHENTICATION ---
@@ -66,11 +66,12 @@ export const veriflowApi = {
     return res.json();
   },
 
-  submitReviewDecision: async (templateId: string, reviewerId: string) => {
+  // UPDATED: Now sends the 'decisions' object to the backend for flag-by-flag updates
+  submitReviewDecision: async (templateId: string, reviewerId: string, decisions: Record<string, 'confirmed' | 'ignored'>) => {
     const res = await fetch(`${API_BASE}/legal/review/${templateId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviewerId })
+      body: JSON.stringify({ reviewerId, decisions })
     });
     if (!res.ok) throw new Error('Review submission failed');
     return res.json();
@@ -116,6 +117,17 @@ export const veriflowApi = {
   createUser: async (userData: any) => {
     const res = await fetch(`${API_BASE}/admin/users`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  // ADDED: Missing method that matches your app.patch('/api/admin/users/:id') backend route
+  updateUser: async (id: string, userData: any) => {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
