@@ -1,6 +1,6 @@
 // src/features/client/ClientDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
 import { getDeviceTrace } from '../../utils/platform';
@@ -12,6 +12,8 @@ import MetricCard from '../../components/layout/MetricCard';
 export default function ClientDashboard({ route }: any) {
   const navigation = useNavigation<any>();
   const { clientId } = route.params;
+  
+  const { height: screenHeight } = useWindowDimensions();
   const { isWeb } = getDeviceTrace();
 
   const [templates, setTemplates] = useState<any[]>([]);
@@ -30,7 +32,6 @@ export default function ClientDashboard({ route }: any) {
     }
   };
 
-  // Re-fetch data every time the user navigates back to this screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchTemplates();
@@ -45,35 +46,28 @@ export default function ClientDashboard({ route }: any) {
 
   const handleTemplateClick = (template: any) => {
     if (template.status === 'pending_client_action') {
-      // Needs user decision on the AI modifications
       navigation.navigate('RedraftAction', { template, clientId });
     } else {
-      // Just viewing the history
       navigation.navigate('AuditTrailScreen', { template });
     }
   };
 
-  // --- RESPONSIVE STYLING ---
-  const containerStyle = "flex-1 bg-brand-dark";
-  const contentStyle = isWeb ? "w-full max-w-5xl mx-auto p-8" : "p-4";
-
-  // Calculate Metrics
   const actionRequiredCount = templates.filter(t => t.status === 'pending_client_action').length;
   const approvedCount = templates.filter(t => t.status === 'approved').length;
 
   return (
-    <View className={containerStyle}>
-      {/* Dashboard Header */}
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      
+      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View>
           <Text className="text-brand-text text-2xl font-black tracking-tighter">Client Terminal</Text>
           <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest mt-1">
-            System ID: {clientId.substring(0, 8)}
+            Client ID: { clientId }
           </Text>
         </View>
         
         <View className="flex-row items-center gap-3">
-          {/* Hide logout text on small mobile screens to save space, but keep the button */}
           <AppButton 
             title={isWeb ? "Logout" : "Exit"} 
             variant="ghost" 
@@ -83,21 +77,23 @@ export default function ClientDashboard({ route }: any) {
           <AppButton 
             title="+ New Draft" 
             onPress={() => navigation.navigate('SubmitDraft', { clientId })} 
-            className="w-28 sm:w-32 h-10" 
+            className="w-28 sm:w-40 h-10" 
           />
         </View>
       </View>
 
+      {/* Scrollable Content */}
       <ScrollView
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: isWeb ? 32 : 16, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#EAB308" />}
       >
-        <View className={contentStyle}>
+        <View className={isWeb ? "w-full max-w-5xl mx-auto" : "w-full"}>
           {loading ? (
             <ActivityIndicator size="large" color="#EAB308" className="mt-20" />
           ) : (
             <>
-              {/* Dynamic Metrics */}
               <View className={isWeb ? "flex-row gap-4 mb-8" : "mb-6 gap-y-4"}>
                 <View className="flex-1"><MetricCard label="Total Drafts" value={templates.length} /></View>
                 <View className="flex-1"><MetricCard label="Action Required" value={actionRequiredCount} /></View>
@@ -106,14 +102,12 @@ export default function ClientDashboard({ route }: any) {
 
               <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Recent Documents</Text>
 
-              {/* Empty State */}
               {templates.length === 0 ? (
                 <InfoCard className="items-center py-10">
                   <Text className="text-brand-muted font-bold text-center">No documents found.</Text>
                   <Text className="text-brand-muted text-xs mt-2 text-center">Click "+ New Draft" to submit a document to the system.</Text>
                 </InfoCard>
               ) : (
-                /* Document List */
                 templates.map((doc) => (
                   <TouchableOpacity 
                     key={doc.id} 
@@ -138,7 +132,6 @@ export default function ClientDashboard({ route }: any) {
                           Updated: <Text className="text-brand-text">{new Date(doc.updatedAt).toLocaleDateString()}</Text>
                         </Text>
                         
-                        {/* Contextual Action Text */}
                         {doc.status === 'pending_client_action' ? (
                           <Text className="text-brand-danger text-[10px] font-black uppercase tracking-widest">Review AI Redraft →</Text>
                         ) : (

@@ -1,6 +1,6 @@
 // src/features/auth/AuthScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import InputField from '../../components/base/InputField';
 import AppButton from '../../components/base/AppButton';
@@ -17,12 +17,13 @@ const ROLES: { id: UserRole; label: string }[] = [
 
 export default function AuthScreen() {
   const navigation = useNavigation<any>();
+  const { height: screenHeight } = useWindowDimensions();
+  const { isWeb } = getDeviceTrace();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('CLIENT');
   const [loading, setLoading] = useState(false);
-
-  const { isWeb } = getDeviceTrace();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,7 +40,7 @@ export default function AuthScreen() {
       } else if (userData.role === 'LEGAL_REVIEWER') {
         navigation.replace('ReviewerDashboard', { reviewerId: userData.id });
       } else if (userData.role === 'ADMIN') {
-        navigation.replace('AdminPanel');
+        navigation.replace('AdminPanel', { adminId: userData.id });
       }
 
     } catch (e: any) {
@@ -49,18 +50,20 @@ export default function AuthScreen() {
     }
   };
 
-  const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center justify-center py-10" 
-    : "flex-1 bg-brand-dark justify-center";
-
-  const contentStyle = isWeb 
-    ? "w-full max-w-md bg-brand-dark p-6" 
-    : "w-full px-6";                      
-
   return (
-    <View className={containerStyle}>
-      <View className={contentStyle}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+    // FIX: Root View strictly fills screen and forces hidden overflow
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      <ScrollView 
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ 
+          padding: 24, 
+          paddingTop: isWeb ? 120 : 80, 
+          paddingBottom: 100, 
+          alignItems: 'center' 
+        }}
+      >
+        <View className="w-full max-w-md">
           
           <View className="mb-10 items-center">
             <Text className="text-brand-text text-4xl font-black tracking-tighter">VeriFlow</Text>
@@ -90,7 +93,6 @@ export default function AuthScreen() {
               label="User Email" 
               value={email} 
               onChangeText={setEmail} 
-              placeholder="someone@example.com" 
               autoCapitalize="none"
               keyboardType="email-address"
             />
@@ -100,7 +102,6 @@ export default function AuthScreen() {
               value={password} 
               onChangeText={setPassword} 
               secureTextEntry
-              placeholder="****" 
             />
 
             <AppButton 
@@ -112,11 +113,11 @@ export default function AuthScreen() {
           </InfoCard>
 
           <Text className="text-brand-muted text-[10px] text-center font-black uppercase tracking-widest leading-5 px-4">
-            Authorized access only. 
+            Authorized access only.
           </Text>
 
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }

@@ -17,7 +17,8 @@ export default function AppButton({
   className = '' 
 }: AppButtonProps) {
   
-  const baseStyles = "w-full h-14 rounded-xl flex-row items-center justify-center transition-colors";
+  // REMOVED "w-full" from baseStyles to allow parent control
+  const baseStyles = "h-14 rounded-xl flex-row items-center justify-center transition-colors";
   
   const variants = {
     primary: "bg-brand-primary active:bg-brand-primaryDark",
@@ -27,10 +28,10 @@ export default function AppButton({
   };
 
   const textStyles = {
-    primary: "text-brand-dark font-black tracking-widest uppercase", // Black text on Yellow button
-    ghost: "text-brand-muted font-bold tracking-wider",
-    danger: "text-brand-danger font-bold tracking-wider",
-    success: "text-brand-dark font-black tracking-widest uppercase",
+    primary: "text-brand-dark font-black tracking-widest uppercase px-6", 
+    ghost: "text-brand-muted font-bold tracking-wider px-6",
+    danger: "text-brand-danger font-bold tracking-wider px-4",
+    success: "text-brand-dark font-black tracking-widest uppercase px-6",
   };
 
   return (

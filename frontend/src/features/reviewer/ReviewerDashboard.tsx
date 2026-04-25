@@ -1,6 +1,6 @@
 // src/features/reviewer/ReviewerDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
 import { getDeviceTrace } from '../../utils/platform';
@@ -12,6 +12,7 @@ import MetricCard from '../../components/layout/MetricCard';
 export default function ReviewerDashboard({ route }: any) {
   const navigation = useNavigation<any>();
   const { reviewerId } = route.params;
+  const { height: screenHeight } = useWindowDimensions();
   const { isWeb } = getDeviceTrace();
 
   const [queue, setQueue] = useState<any[]>([]);
@@ -46,22 +47,19 @@ export default function ReviewerDashboard({ route }: any) {
     navigation.navigate('RedraftReviewScreen', { template, reviewerId });
   };
 
-  // --- RESPONSIVE STYLING ---
-  const containerStyle = "flex-1 bg-brand-dark";
-  const contentStyle = isWeb ? "w-full max-w-5xl mx-auto p-8" : "p-4";
-
-  // Calculate Metrics
   const totalFlags = queue.reduce((acc, doc) => acc + (doc.flags?.length || 0), 0);
   const uniqueClients = new Set(queue.map(doc => doc.clientId)).size;
 
   return (
-    <View className={containerStyle}>
-      {/* Dashboard Header */}
+    // FIX: Root View strictly fills screen and forces hidden overflow
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      
+      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View>
           <Text className="text-brand-text text-2xl font-black tracking-tighter">Legal Terminal</Text>
           <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest mt-1">
-            Reviewer ID: {reviewerId.substring(0, 8)}
+            Reviewer ID: { reviewerId }
           </Text>
         </View>
         
@@ -73,16 +71,18 @@ export default function ReviewerDashboard({ route }: any) {
         />
       </View>
 
+      {/* FIX: ScrollView with hardcoded flex and web overflow */}
       <ScrollView
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: isWeb ? 32 : 16, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#EAB308" />}
       >
-        <View className={contentStyle}>
+        <View className={isWeb ? "w-full max-w-5xl mx-auto" : "w-full"}>
           {loading ? (
             <ActivityIndicator size="large" color="#EAB308" className="mt-20" />
           ) : (
             <>
-              {/* Dynamic Metrics */}
               <View className={isWeb ? "flex-row gap-4 mb-8" : "mb-6 gap-y-4"}>
                 <View className="flex-1"><MetricCard label="Pending Review" value={queue.length} /></View>
                 <View className="flex-1"><MetricCard label="Total Flags" value={totalFlags} /></View>
@@ -91,14 +91,12 @@ export default function ReviewerDashboard({ route }: any) {
 
               <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Active Queue</Text>
 
-              {/* Empty State */}
               {queue.length === 0 ? (
                 <InfoCard className="items-center py-10">
                   <Text className="text-brand-muted font-bold text-center">The queue is currently empty.</Text>
                   <Text className="text-brand-muted text-xs mt-2 text-center">All submitted documents have been processed.</Text>
                 </InfoCard>
               ) : (
-                /* Document List */
                 queue.map((doc) => (
                   <TouchableOpacity 
                     key={doc.id} 
@@ -124,7 +122,7 @@ export default function ReviewerDashboard({ route }: any) {
                         </Text>
                         
                         <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest">
-                          Start Review →
+                          Start Review
                         </Text>
                       </View>
                     </InfoCard>

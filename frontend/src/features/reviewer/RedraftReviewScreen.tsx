@@ -1,6 +1,6 @@
 // src/features/reviewer/RedraftReviewScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
 import { getDeviceTrace } from '../../utils/platform';
@@ -11,12 +11,12 @@ import StatusBadge from '../../components/base/StatusBadge';
 
 export default function RedraftReviewScreen({ route }: any) {
   const navigation = useNavigation<any>();
+  const { height: screenHeight } = useWindowDimensions();
   const { template, reviewerId } = route.params;
   const { isWeb } = getDeviceTrace();
 
   const [loading, setLoading] = useState(false);
 
-  // Determine if the AI found any flags to show the appropriate UI state
   const hasFlags = template.flags && template.flags.length > 0;
 
   const handleDecision = async () => {
@@ -24,7 +24,7 @@ export default function RedraftReviewScreen({ route }: any) {
     try {
       await veriflowApi.submitReviewDecision(template.id, reviewerId);
       Alert.alert("Success", "Your review decision has been recorded securely.");
-      navigation.goBack(); // Return to the queue
+      navigation.goBack(); 
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to submit review.");
     } finally {
@@ -32,12 +32,11 @@ export default function RedraftReviewScreen({ route }: any) {
     }
   };
 
-  const containerStyle = "flex-1 bg-brand-dark";
-  const contentStyle = isWeb ? "w-full max-w-6xl mx-auto p-8" : "p-4 pt-8";
-
   return (
-    <View className={containerStyle}>
-      {/* Header */}
+    // FIX: Root View strictly fills screen and forces hidden overflow
+    <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
+      
+      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
         <View className="flex-1 pr-4">
           <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
@@ -55,15 +54,19 @@ export default function RedraftReviewScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View className={contentStyle}>
+      {/* FIX: ScrollView with hardcoded flex and web overflow */}
+      <ScrollView 
+        style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ padding: isWeb ? 32 : 16, paddingBottom: 100 }}
+      >
+        <View className={isWeb ? "w-full max-w-6xl mx-auto" : "w-full"}>
           
           <View className="flex-row items-center justify-between mb-6 px-2">
             <Text className="text-brand-text text-xl font-black tracking-tighter">Document Analysis</Text>
             <StatusBadge status={template.status} />
           </View>
 
-          {/* Document Meta Info */}
           <View className={isWeb ? "flex-row gap-6 mb-8" : "mb-8 gap-y-4"}>
             <View className="flex-1">
               <InfoCard>
@@ -76,12 +79,11 @@ export default function RedraftReviewScreen({ route }: any) {
               <InfoCard>
                 <Text className="text-brand-muted text-[10px] uppercase font-black tracking-widest mb-1">Document Type</Text>
                 <Text className="text-brand-text font-bold text-lg">{template.documentType}</Text>
-                <Text className="text-brand-muted text-xs">ID: {template.id.substring(0, 8)}</Text>
+                <Text className="text-brand-muted text-xs">ID: {template.id}</Text>
               </InfoCard>
             </View>
           </View>
 
-          {/* Content View */}
           <View className="mb-8">
             <VersionBox 
               label="Submitted Content" 
@@ -90,7 +92,6 @@ export default function RedraftReviewScreen({ route }: any) {
             />
           </View>
 
-          {/* System Flags Section */}
           <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">System Flags</Text>
           <InfoCard className="mb-8">
             {hasFlags ? (
@@ -115,7 +116,6 @@ export default function RedraftReviewScreen({ route }: any) {
             )}
           </InfoCard>
 
-          {/* Action Area */}
           <InfoCard className="mb-12">
             <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Reviewer Decision</Text>
             <Text className="text-brand-muted text-sm leading-6 mb-6">

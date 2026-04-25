@@ -1,3 +1,4 @@
+// backend/src/server.ts
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
@@ -10,7 +11,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-
 const ensureString = (val: any, fallback = ''): string => {
   if (val === undefined || val === null) return fallback;
   if (Array.isArray(val)) return String(val[0]);
@@ -21,7 +21,6 @@ const getSafeTrace = (req: Request) => ({
   ip: ensureString(req.ip || req.socket?.remoteAddress, '0.0.0.0'),
   ua: ensureString(req.headers['user-agent'], 'unknown_device')
 });
-
 
 // --- 1. LOGIN ROUTE ---
 app.post('/api/auth/login', async (req: Request, res: Response) => {
@@ -444,7 +443,14 @@ app.get('/api/client/templates/:clientId', async (req: Request, res: Response) =
   try {
     const templates = await prisma.template.findMany({
       where: { clientId },
-      include: { flags: true, redrafts: true },
+      include: { 
+        flags: true, 
+        redrafts: true,
+        auditLogs: { orderBy: { createdAt: 'desc' } },
+        signatures: { orderBy: { signedAt: 'desc' } },
+        client: { include: { company: true } },
+        reviewer: true
+      },
       orderBy: { updatedAt: 'desc' }
     });
     res.json(templates);
@@ -458,7 +464,11 @@ app.get('/api/legal/queue', async (req: Request, res: Response) => {
   try {
     const queue = await prisma.template.findMany({
       where: { status: 'pending_legal' },
-      include: { client: { select: { name: true, company: true } }, flags: true },
+      include: { 
+        flags: true,
+        client: { include: { company: true } }, 
+        reviewer: true
+      },
       orderBy: { updatedAt: 'asc' }
     });
     res.json(queue);
