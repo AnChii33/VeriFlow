@@ -1,6 +1,5 @@
 import re
 import json
-from langchain_core.output_parsers import JsonOutputParser
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -130,11 +129,9 @@ Template to Evaluate:
    - Check whether the template complies with the rules or not.
    - A detailed explanation of why if the template doesnt comply.
 4. Provide an overall compliance report:
-   - that contains all the rules that are violated or not compliant to along with the explanation of why not compliant if none of the rules are violated or not compliant return NULL
-6.after understanding the context of the given template to evaluate and compliance issue generate two template suggestion that would be compliant based on the compliance rule.
+   - that contains all the rules that are violated or not compliant along with the explanation of why not compliant if none of the rules are violated or not compliant return NULL
 
 ### Output Format (STRICT JSON ONLY)
-
 Return ONLY valid JSON. No markdown. No bullet points. No explanations outside JSON.
 
 {{
@@ -142,13 +139,33 @@ Return ONLY valid JSON. No markdown. No bullet points. No explanations outside J
     {{
       "rule": "11.1 Scope",
       "status": "NULL"(always),
-      "explanation": "Explain why"
+      "explanation": "Explain why the template violates this rule."
     }}
   ],
-  "suggested_templates": [
-    "string",
-    "string"
-  ]
+  "overall_verdict": "Non-Compliant"
+}}
+"""
+
+
+REDRAFT_SUGGESTION_TEMPLATE = """
+You are a legal-tech writer specializing in 21 CFR Part 11 compliance.
+Your goal is to rewrite a non-compliant messaging template to be fully compliant.
+
+### Original Template:
+{original_template}
+
+### Violations Identified:
+{violations}
+
+### Instructions:
+Based on the analysis of violations found, generate TWO distinct, high-quality ways to rewrite this template so that they are fully compliant to the rules that the initial user template violated. 
+- **Suggestion 1 (Minimal Friction):** Fix the core legal issues while staying as close to the original format and intent as possible.
+- **Suggestion 2 (Maximum Security):** A "best practice" rewrite that prioritizes absolute regulatory safety.
+
+Output ONLY a valid JSON object:
+{{
+  "suggestion_1": "string",
+  "suggestion_2": "string"
 }}
 """
 
@@ -166,7 +183,7 @@ def evaluate_compliance(template_text, context, llm):
     
     # We use a custom chain here to force JsonOutputParser
     prompt = PromptTemplate.from_template(COMPLIANCE_EVAL_TEMPLATE)
-    eval_chain = prompt | llm | StrOutputParser()
+    eval_chain = prompt | llm | JsonOutputParser()
     
     try:
         # This will return a Python dictionary parsed from the LLM's JSON output
@@ -180,49 +197,29 @@ def evaluate_compliance(template_text, context, llm):
         print(f"JSON Parsing Error: {e}")
         return {"status": "Error", "reason": "Failed to generate valid compliance report."}
 
-##response generated parsing
-def parse_compliance_report(text):
-    data = {
-        "rules": [],
-        "overall_verdict": None,
-        "recommendations": [],
-        "suggested_templates": []
-    }
 
-    # -------- RULES --------
-    rule_blocks = re.findall(
-        r"\*\*Rule:\s*(.*?)\.\*\*\s*-\s*(Yes|No|N/A)(?:\s*–\s*(.*))?",
-        text
-    )
-    for rule, status, explanation in rule_blocks:
-        data["rules"].append({
-            "rule": rule.strip(),
-            "status": status.strip(),
-            "explanation": explanation.strip() if explanation else ""
+def generate_compliant_suggestions(original_template, violations_report, llm):
+    print("Generating compliant redrafts...")
+    # Convert the violations dictionary into a string so the AI can read it
+    violations_str = json.dumps(violations_report.get("rules", []), indent=2)
+    
+    prompt = PromptTemplate.from_template(REDRAFT_SUGGESTION_TEMPLATE)
+    chain = prompt | llm | JsonOutputParser()
+    
+    try:
+        return chain.invoke({
+            "original_template": original_template,
+            "violations": violations_str
         })
-     # -------- OVERALL VERDICT --------
-    verdict_match = re.search(r"\*\*Overall Verdict:\*\*\s*(.*)", text)
-    if verdict_match:
-        data["overall_verdict"] = verdict_match.group(1).strip()
-
-    # -------- RECOMMENDATIONS --------
-    recs = re.findall(r"\d+\.\s+(.*)", text)
-    data["recommendations"] = recs
-    # -------- SUGGESTED TEMPLATES --------
-    templates = re.findall(
-        r"\*\*Suggested template \d+:\*\*\s*\"(.*?)\"",
-        text,
-        re.DOTALL
-    )
-    data["suggested_templates"] = [t.strip() for t in templates]
-
-    return data
+    except Exception as e:
+        print(f"JSON Parsing Error in Redraft: {e}")
+        return {"suggestion_1": "Error generating", "suggestion_2": "Error generating"}
 
 # 3. How your new pipeline flow looks
 def validate_template_pipeline(env_path, template_text):
     embd_path, emb_name, sent_model, cross_model, api, llm_mod = get_configuration(env_path)
     
-    llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api)
+    llm = ChatGoogleGenerativeAI(model=llm_mod, google_api_key=api, temperature=2)
     embeddings = HuggingFaceEmbeddings(model_name=sent_model)
     
     vectorstore = FAISS.load_local(
@@ -245,9 +242,18 @@ def validate_template_pipeline(env_path, template_text):
     reranked_docs = reranker.compress_documents(raw_docs, search_query)
     policy_context = "\n\n".join([doc.page_content for doc in reranked_docs])
     
-    # Step D: Evaluate and return the JSON payload for your web frontend
-    final_report = evaluate_compliance(template_text, policy_context, llm)
-    return final_report
+    # Step D: Evaluate to get the JSON audit
+    eval_report = evaluate_compliance(template_text, policy_context, llm)
+    
+    # Step E: Redraft the templates based on the audit
+    suggestions = generate_compliant_suggestions(template_text, eval_report, llm)
+    
+    # Step F: Merge into one beautiful JSON payload for the UI
+    final_payload = {
+        "evaluation": eval_report,
+        "suggested_templates": suggestions
+    }
+    return final_payload
 
 
 
