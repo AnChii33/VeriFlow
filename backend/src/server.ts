@@ -495,7 +495,10 @@ app.get('/api/client/templates/:clientId', async (req: Request, res: Response) =
       where: { clientId },
       include: { 
         flags: true, 
-        redrafts: true,
+        redrafts: {
+          where: { status: 'pending' },
+          orderBy: { createdAt: 'asc' }
+        },
         auditLogs: { orderBy: { createdAt: 'desc' } },
         signatures: { orderBy: { signedAt: 'desc' } },
         client: { include: { company: true } },
