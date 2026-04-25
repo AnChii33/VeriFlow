@@ -42,7 +42,6 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
     const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
     
-    // BCRYPT SECURE COMPARISON
     if (!cred || !(await bcrypt.compare(password, cred.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -97,6 +96,7 @@ app.post('/api/templates/submit', async (req: Request, res: Response) => {
 });
 
 // --- 3. STATE: pending_legal ---
+// This route is called by the Python Worker after RAG Analysis
 app.post('/api/ai/analysis-complete', async (req: Request, res: Response) => {
   const templateId = ensureString(req.body.templateId);
   const flags = Array.isArray(req.body.flags) ? req.body.flags : [];
@@ -110,7 +110,8 @@ app.post('/api/ai/analysis-complete', async (req: Request, res: Response) => {
           flags: { 
             create: flags.map((f: any) => ({ 
               cfr_section: ensureString(f.cfr_section), 
-              explanation: ensureString(f.explanation) 
+              explanation: ensureString(f.explanation),
+              status: 'pending' // Initial status for flags
             })) 
           }
         },
@@ -132,28 +133,50 @@ app.post('/api/ai/analysis-complete', async (req: Request, res: Response) => {
 });
 
 // --- 4. STATE: pending_ai_redrafts OR approved ---
+// UPDATED: Now handles individual flag decisions from the Reviewer
 app.patch('/api/legal/review/:id', async (req: Request, res: Response) => {
   const id = ensureString(req.params.id);
   const reviewerId = ensureString(req.body.reviewerId);
+  const decisions = req.body.decisions; // Expected: { [flagId]: 'confirmed' | 'ignored' }
   const { ip, ua } = getSafeTrace(req);
 
   try {
     const reviewer = await prisma.legalReviewer.findUnique({ where: { id: reviewerId } });
-    const template = await prisma.template.findUnique({ where: { id }, include: { flags: true } });
+    const template = await prisma.template.findUnique({ 
+      where: { id }, 
+      include: { flags: true } 
+    });
 
     if (!template || !reviewer) return res.status(404).json({ error: 'Reference not found' });
 
-    const nextState = template.flags.length > 0 ? 'pending_ai_redrafts' : 'approved';
-
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Update individual flag statuses
+      if (decisions && typeof decisions === 'object') {
+        for (const [flagId, status] of Object.entries(decisions)) {
+          await tx.legalFlag.update({
+            where: { id: flagId },
+            data: { status: status as string }
+          });
+        }
+      }
+
+      // 2. Determine next state: if any flags were confirmed, request redraft
+      const confirmedFlags = await tx.legalFlag.count({
+        where: { templateId: id, status: 'confirmed' }
+      });
+
+      const nextState = confirmedFlags > 0 ? 'pending_ai_redrafts' : 'approved';
+
+      // 3. Update the Template
       const updated = await tx.template.update({
-        where: { id }, data: { status: nextState, reviewerId }
+        where: { id }, 
+        data: { status: nextState, reviewerId }
       });
 
       await tx.auditLog.create({
         data: {
           templateId: id, actorId: reviewerId, actorType: 'LEGAL_REVIEWER',
-          newState: nextState, details: `Legal review processed.`
+          newState: nextState, details: `Legal review processed. ${confirmedFlags} flags confirmed.`
         }
       });
 
@@ -174,24 +197,31 @@ app.patch('/api/legal/review/:id', async (req: Request, res: Response) => {
 });
 
 // --- 5. STATE: pending_client_action ---
+// This route is called by the Python Worker after RAG Redrafting
 app.post('/api/ai/redrafts-complete', async (req: Request, res: Response) => {
   const templateId = ensureString(req.body.templateId);
-  const aiContent = ensureString(req.body.aiContent);
+  const redrafts = Array.isArray(req.body.redrafts) ? req.body.redrafts : [];
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      await tx.redraftedTemplate.create({
-        data: { templateId, modContent: aiContent, status: 'pending' }
+      // Create entries for both suggestions in RedraftedTemplate
+      await tx.redraftedTemplate.createMany({
+        data: redrafts.map((content: string) => ({
+          templateId,
+          modContent: content,
+          status: 'pending'
+        }))
       });
 
       const updated = await tx.template.update({
-        where: { id: templateId }, data: { status: 'pending_client_action' }
+        where: { id: templateId }, 
+        data: { status: 'pending_client_action' }
       });
 
       await tx.auditLog.create({
         data: {
           templateId, actorId: 'RAG_ENGINE', actorType: 'AI',
-          newState: 'pending_client_action', details: 'AI redrafts generated.'
+          newState: 'pending_client_action', details: 'AI redrafts generated and attached.'
         }
       });
       return updated;
@@ -276,7 +306,7 @@ app.post('/api/client/respond/:id', async (req: Request, res: Response) => {
   }
 });
 
-// --- 7. GLOBAL ADMIN LEDGER ---
+// --- 7. ADMIN & UTILITY ROUTES ---
 app.get('/api/admin/ledger', async (req: Request, res: Response) => {
   try {
     const auditTrail = await prisma.template.findMany({
@@ -293,7 +323,6 @@ app.get('/api/admin/ledger', async (req: Request, res: Response) => {
   }
 });
 
-// --- GET ALL COMPANIES ---
 app.get('/api/admin/companies', async (req: Request, res: Response) => {
   try {
     const companies = await prisma.company.findMany({
@@ -306,7 +335,6 @@ app.get('/api/admin/companies', async (req: Request, res: Response) => {
   }
 });
 
-// --- CREATE NEW COMPANY ---
 app.post('/api/admin/companies', async (req: Request, res: Response) => {
   const name = ensureString(req.body.name);
   const domain = ensureString(req.body.domain);
@@ -320,7 +348,6 @@ app.post('/api/admin/companies', async (req: Request, res: Response) => {
   }
 });
 
-// --- CREATE NEW USERS ---
 app.post('/api/admin/users', async (req: Request, res: Response) => {
   const safeRole = ensureString(req.body.role) as 'CLIENT' | 'LEGAL_REVIEWER' | 'ADMIN';
   const email = ensureString(req.body.email);
@@ -331,7 +358,6 @@ app.post('/api/admin/users', async (req: Request, res: Response) => {
 
   try {
     const newId = generateRoleId(safeRole);
-    // BCRYPT HASHING
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await prisma.$transaction(async (tx) => {
@@ -363,7 +389,6 @@ app.post('/api/admin/users', async (req: Request, res: Response) => {
   }
 });
 
-// --- GET ALL USERS ---
 app.get('/api/admin/users', async (req: Request, res: Response) => {
   try {
     const clients = await prisma.client.findMany({ include: { company: true } });
@@ -375,7 +400,6 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
   }
 });
 
-// --- UPDATE USER ---
 app.patch('/api/admin/users/:id', async (req: Request, res: Response) => {
   const id = ensureString(req.params.id);
   const safeRole = ensureString(req.body.role);
@@ -408,7 +432,6 @@ app.patch('/api/admin/users/:id', async (req: Request, res: Response) => {
   }
 });
 
-// --- DELETE USER ---
 app.delete('/api/admin/users/:id', async (req: Request, res: Response) => {
   const id = ensureString(req.params.id);
   const safeRole = ensureString(req.body.role);
@@ -426,18 +449,6 @@ app.delete('/api/admin/users/:id', async (req: Request, res: Response) => {
   }
 });
 
-// --- DELETE COMPANY ---
-app.delete('/api/admin/companies/:id', async (req: Request, res: Response) => {
-  const id = ensureString(req.params.id);
-  try {
-    await prisma.company.delete({ where: { id } });
-    res.json({ success: true, message: 'Company deleted' });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to delete company.' });
-  }
-});
-
-// --- GET CLIENT TEMPLATES ---
 app.get('/api/client/templates/:clientId', async (req: Request, res: Response) => {
   const clientId = ensureString(req.params.clientId);
   try {
@@ -459,7 +470,6 @@ app.get('/api/client/templates/:clientId', async (req: Request, res: Response) =
   }
 });
 
-// --- GET LEGAL QUEUE ---
 app.get('/api/legal/queue', async (req: Request, res: Response) => {
   try {
     const queue = await prisma.template.findMany({
