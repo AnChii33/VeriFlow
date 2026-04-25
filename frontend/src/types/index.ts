@@ -1,42 +1,67 @@
-export type FSMStatus = 
+// src/types/index.ts
+
+export type UserRole = 'CLIENT' | 'LEGAL_REVIEWER' | 'ADMIN';
+
+export type TemplateStatus = 
   | 'pending_ai_flags' 
   | 'pending_legal' 
   | 'pending_ai_redrafts' 
   | 'pending_client_action' 
   | 'approved';
 
+// --- User Models ---
+export interface BaseUser {
+  id: string; // E.g., C-123, L-456, A-789
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface Client extends BaseUser {
+  companyId: string;
+  company?: Company;
+}
+
+export interface LegalReviewer extends BaseUser {
+  barNumber?: string | null;
+}
+
+export interface Admin extends BaseUser {}
+
 export interface Company {
   id: string;
   name: string;
-  domain?: string;
+  domain?: string | null;
+  _count?: {
+    clients: number;
+  };
   createdAt: string;
-  clients?: Client[];
 }
 
-export interface Client {
+// --- Ledger & Document Models ---
+export interface Template {
   id: string;
-  email: string;
-  name: string;
-  companyId: string;
-  company?: Company;
-  createdAt: string;
-  templates?: Template[];
-  signatures?: SignatureRecord[];
-}
+  title: string;
+  documentType: string;
+  content: string;
+  status: TemplateStatus;
+  clientId: string;
+  reviewerId?: string | null;
+  
+  client?: Client;
+  reviewer?: LegalReviewer;
+  
+  flags?: LegalFlag[];
+  redrafts?: RedraftedTemplate[];
+  auditLogs?: AuditLog[];
+  signatures?: DigitalSignature[];
 
-export interface LegalReviewer {
-  id: string;
-  email: string;
-  name: string;
-  barNumber?: string;
   createdAt: string;
-  assignedDocs?: Template[];
-  signatures?: SignatureRecord[];
+  updatedAt: string;
 }
 
 export interface LegalFlag {
   id: string;
-  templateId: string;
   cfr_section: string;
   explanation: string;
   status: string;
@@ -45,7 +70,6 @@ export interface LegalFlag {
 
 export interface RedraftedTemplate {
   id: string;
-  templateId: string;
   modContent: string;
   status: string;
   createdAt: string;
@@ -53,45 +77,20 @@ export interface RedraftedTemplate {
 
 export interface AuditLog {
   id: string;
-  templateId: string;
   actorId: string;
-  actorType: 'CLIENT' | 'AI' | 'LEGAL_REVIEWER' | 'ADMIN';
-  prevState?: string;
+  actorType: string;
   newState: string;
-  details?: string;
+  details: string;
   createdAt: string;
 }
 
-export interface SignatureRecord {
+export interface DigitalSignature {
   id: string;
-  templateId: string;
   action: string;
-  clientId?: string;
-  client?: Client;
-  reviewerId?: string;
-  reviewer?: LegalReviewer;
   printedName: string;
   signatureMeaning: string;
   documentHash: string;
   ipAddress?: string;
   userTrace?: string;
   signedAt: string;
-}
-
-export interface Template {
-  id: string;
-  content: string;
-  status: FSMStatus;
-  title: string;
-  documentType: string;
-  clientId: string;
-  client?: Client;
-  reviewerId?: string;
-  reviewer?: LegalReviewer;
-  createdAt: string;
-  updatedAt: string;
-  flags: LegalFlag[];
-  redrafts: RedraftedTemplate[];
-  auditLogs: AuditLog[];
-  signatures: SignatureRecord[];
 }

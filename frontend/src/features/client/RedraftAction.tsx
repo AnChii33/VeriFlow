@@ -1,115 +1,170 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+// src/features/client/RedraftAction.tsx
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
-import { Template } from '../../types';
-import VersionBox from '../../components/layout/VersionBox';
+import { getDeviceTrace } from '../../utils/platform';
+import InfoCard from '../../components/layout/InfoCard';
 import AppButton from '../../components/base/AppButton';
 import InputField from '../../components/base/InputField';
-import { getDeviceTrace } from '../../utils/platform';
+import VersionBox from '../../components/layout/VersionBox';
+import StatusBadge from '../../components/base/StatusBadge';
 
-export default function RedraftAction({ route, navigation }: any) {
-  const { templateId } = route.params;
-  const [template, setTemplate] = useState<Template | null>(null);
-  const [manualEdit, setManualEdit] = useState('');
-  const [showEditor, setShowEditor] = useState(false);
-  const [loading, setLoading] = useState(false);
-
+export default function RedraftAction({ route }: any) {
+  const navigation = useNavigation<any>();
+  const { template, clientId } = route.params;
   const { isWeb } = getDeviceTrace();
 
-  const fetchData = async () => {
-    try {
-      const data = await veriflowApi.getLedger();
-      const doc = data.find(t => t.id === templateId);
-      setTemplate(doc || null);
-      if (doc) setManualEdit(doc.content);
-    } catch (e) {
-      Alert.alert("System Error", "Fetch failed");
+  // Find the most recent redraft from the array
+  const latestRedraft = useMemo(() => {
+    if (!template.redrafts || template.redrafts.length === 0) return null;
+    return [...template.redrafts].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+  }, [template]);
+
+  const proposedContent = latestRedraft?.modContent || 'No AI modifications found.';
+
+  const [loading, setLoading] = useState(false);
+  const [isManualEdit, setIsManualEdit] = useState(false);
+  const [manualText, setManualText] = useState(proposedContent);
+
+  const handleAction = async (actionType: 'ACCEPT' | 'RE_SUBMIT') => {
+    if (actionType === 'RE_SUBMIT' && !manualText.trim()) {
+      Alert.alert("Validation", "Manual edit content cannot be empty.");
+      return;
     }
-  };
 
-  useEffect(() => { fetchData(); }, []);
-
-  const onAccept = async () => {
     setLoading(true);
     try {
-      await veriflowApi.clientRespond(templateId, 'ACCEPT');
-      navigation.navigate('ClientDashboard', { clientId: template?.clientId });
-    } catch (e) {
-      Alert.alert("Error", "Acceptance failed");
+      await veriflowApi.respondToRedraft(
+        template.id, 
+        actionType, 
+        actionType === 'RE_SUBMIT' ? manualText : undefined
+      );
+      
+      Alert.alert("Success", "Your decision has been logged.");
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert("Submission Failed", e.message || "Could not process your request.");
     } finally {
       setLoading(false);
     }
   };
 
-  const onManualSubmit = async () => {
-    setLoading(true);
-    try {
-      await veriflowApi.clientRespond(templateId, 'RE_SUBMIT', manualEdit);
-      navigation.navigate('ClientDashboard', { clientId: template?.clientId });
-    } catch (e) {
-      Alert.alert("Error", "Manual re-submission failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!template) return null;
-
-  const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center py-10" 
-    : "flex-1 bg-brand-dark";
-
-  const contentStyle = isWeb 
-    ? "w-full max-w-5xl bg-brand-card p-10 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden" 
-    : "w-full px-6 pt-12";
+  const containerStyle = "flex-1 bg-brand-dark";
+  const contentStyle = isWeb ? "w-full max-w-6xl mx-auto p-8" : "p-4 pt-8";
 
   return (
     <View className={containerStyle}>
-      <View className={contentStyle}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text className="text-white text-2xl font-black mb-2">Review Suggested Redraft</Text>
-          <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px] mb-6">
-            State: Pending Client Action
+      {/* Header */}
+      <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
+        <View className="flex-1 pr-4">
+          <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
+            Resolve Modifications
           </Text>
-
-          {!showEditor ? (
-            <View className="gap-y-6">
-              <View className={isWeb ? "flex-row gap-x-6" : "gap-y-6"}>
-                <View className="flex-1">
-                  <VersionBox label="Original Draft" content={template.content} />
-                </View>
-                <View className="flex-1">
-                  <VersionBox 
-                    label="AI Redraft (Compliant)" 
-                    content={template.redrafts[0]?.modContent || ''} 
-                    isActive 
-                  />
-                </View>
-              </View>
-              
-              <View className={`gap-y-3 mt-4 mb-10 ${isWeb ? "max-w-xs" : "w-full"}`}>
-                <AppButton title="Accept and Approve" variant="success" onPress={onAccept} loading={loading} />
-                <AppButton title="Edit Manually" variant="ghost" onPress={() => setShowEditor(true)} />
-              </View>
-            </View>
-          ) : (
-            <View className="mb-10">
-              <InputField 
-                label="Manual Redraft Editor" 
-                value={manualEdit} 
-                onChangeText={setManualEdit} 
-                multiline 
-                numberOfLines={isWeb ? 15 : 8}
-                style={{ textAlignVertical: 'top' }}
-              />
-              <View className={`gap-y-3 ${isWeb ? "max-w-xs" : "w-full"}`}>
-                <AppButton title="Re-submit to AI Analysis" variant="primary" onPress={onManualSubmit} loading={loading} />
-                <AppButton title="Cancel" variant="ghost" onPress={() => setShowEditor(false)} />
-              </View>
-            </View>
-          )}
-        </ScrollView>
+          <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest mt-1">
+            Template: {template.title}
+          </Text>
+        </View>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          className="bg-brand-dark px-4 py-2 rounded-lg border border-brand-border"
+        >
+          <Text className="text-brand-muted text-[10px] font-black uppercase tracking-widest">Cancel</Text>
+        </TouchableOpacity>
       </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className={contentStyle}>
+          
+          <View className="flex-row items-center justify-between mb-6 px-2">
+            <Text className="text-brand-text text-xl font-black tracking-tighter">Document Revision</Text>
+            <StatusBadge status={template.status} />
+          </View>
+
+          {/* Comparison Area */}
+          <View className={isWeb ? "flex-row gap-6 mb-8" : "mb-8 gap-y-4"}>
+            <View className="flex-1">
+              <VersionBox 
+                label="Original Submission" 
+                content={template.content} 
+                isActive={false} 
+              />
+            </View>
+            <View className="flex-1">
+              <VersionBox 
+                label="System Proposed Redraft" 
+                content={proposedContent} 
+                isActive={true} 
+              />
+            </View>
+          </View>
+
+          {/* Action Area */}
+          <InfoCard>
+            {!isManualEdit ? (
+              <View>
+                <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Decision Required</Text>
+                <Text className="text-brand-muted text-sm leading-6 mb-8">
+                  The system has identified necessary changes to your draft. You may accept the exact proposed text above, or choose to modify it yourself for another review cycle.
+                </Text>
+                
+                <View className={isWeb ? "flex-row gap-4" : "gap-4"}>
+                  <View className={isWeb ? "flex-1" : "w-full"}>
+                    <AppButton 
+                      title="Accept System Redraft" 
+                      variant="success"
+                      loading={loading}
+                      onPress={() => handleAction('ACCEPT')} 
+                    />
+                  </View>
+                  <View className={isWeb ? "flex-1" : "w-full"}>
+                    <AppButton 
+                      title="I want to edit manually" 
+                      variant="ghost"
+                      onPress={() => setIsManualEdit(true)} 
+                    />
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View>
+                <Text className="text-brand-text text-lg font-black tracking-tight mb-4">Manual Override</Text>
+                
+                <InputField 
+                  label="Edit Content"
+                  value={manualText}
+                  onChangeText={setManualText}
+                  multiline
+                  numberOfLines={isWeb ? 12 : 8}
+                />
+                
+                <View className={isWeb ? "flex-row gap-4 mt-4" : "gap-4 mt-4"}>
+                  <View className={isWeb ? "flex-1" : "w-full"}>
+                    <AppButton 
+                      title="Submit for Re-Analysis" 
+                      loading={loading}
+                      onPress={() => handleAction('RE_SUBMIT')} 
+                    />
+                  </View>
+                  <View className={isWeb ? "flex-1" : "w-full"}>
+                    <AppButton 
+                      title="Cancel Override" 
+                      variant="ghost"
+                      onPress={() => {
+                        setIsManualEdit(false);
+                        setManualText(proposedContent); // Reset text
+                      }} 
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+          </InfoCard>
+
+        </View>
+      </ScrollView>
     </View>
   );
 }

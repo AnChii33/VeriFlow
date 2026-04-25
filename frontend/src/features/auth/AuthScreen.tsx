@@ -1,114 +1,122 @@
+// src/features/auth/AuthScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/types';
-import AppButton from '../../components/base/AppButton';
 import InputField from '../../components/base/InputField';
+import AppButton from '../../components/base/AppButton';
+import InfoCard from '../../components/layout/InfoCard';
 import { getDeviceTrace } from '../../utils/platform';
 import { veriflowApi } from '../../services/api';
+import { UserRole } from '../../types';
+
+const ROLES: { id: UserRole; label: string }[] = [
+  { id: 'CLIENT', label: 'Client' },
+  { id: 'LEGAL_REVIEWER', label: 'Legal Team' },
+  { id: 'ADMIN', label: 'Admin' }
+];
 
 export default function AuthScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<any>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<UserRole>('CLIENT');
   const [loading, setLoading] = useState(false);
-  
+
   const { isWeb } = getDeviceTrace();
 
-  const handleLogin = async (role: 'CLIENT' | 'LEGAL') => {
+  const handleLogin = async () => {
     if (!email || !password) {
-      isWeb ? alert("Please enter credentials") : Alert.alert("Error", "Please enter credentials");
+      Alert.alert("Authentication Error", "Please provide both an email and a password.");
       return;
     }
 
     setLoading(true);
     try {
-      const data = await veriflowApi.login({ email, password, role });
-      
-      if (role === 'CLIENT') {
-        navigation.navigate('ClientDashboard', { clientId: data.userId });
-      } else {
-        navigation.navigate('ReviewerDashboard', { reviewerId: data.userId });
+      const userData = await veriflowApi.login({ email, password, role });
+
+      if (userData.role === 'CLIENT') {
+        navigation.replace('ClientDashboard', { clientId: userData.id });
+      } else if (userData.role === 'LEGAL_REVIEWER') {
+        navigation.replace('ReviewerDashboard', { reviewerId: userData.id });
+      } else if (userData.role === 'ADMIN') {
+        navigation.replace('AdminPanel');
       }
-    } catch (error) {
-      const msg = "Invalid email or password";
-      isWeb ? alert(msg) : Alert.alert("Login Failed", msg);
+
+    } catch (e: any) {
+      Alert.alert("Access Denied", e.message || "Invalid credentials or server unreachable.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Platform-specific styling logic
   const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center justify-center p-4" 
-    : "flex-1 bg-brand-dark px-8 justify-center";
+    ? "flex-1 bg-brand-dark items-center justify-center py-10" 
+    : "flex-1 bg-brand-dark justify-center";
 
-  const cardStyle = isWeb 
-    ? "w-full max-w-md bg-brand-card p-10 rounded-3xl border border-slate-800 shadow-2xl" 
-    : "w-full mt-10";
+  const contentStyle = isWeb 
+    ? "w-full max-w-md bg-brand-dark p-6" 
+    : "w-full px-6";                      
 
   return (
     <View className={containerStyle}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className={cardStyle}
-      >
-        <View className="mb-10 items-center">
-          <View className="w-16 h-16 bg-blue-600 rounded-3xl items-center justify-center mb-6 shadow-xl shadow-blue-500/50">
-            <Text className="text-white text-3xl font-black">V</Text>
-          </View>
-          <Text className="text-white text-4xl font-black tracking-tighter">VeriFlow</Text>
-          <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[6px] mt-2 text-center">
-            Compliance Engine
-          </Text>
-        </View>
-
-        <View className="gap-y-4 mb-6">
-          <InputField 
-            label="Email Address" 
-            value={email} 
-            onChangeText={setEmail} 
-            placeholder="name@company.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <InputField 
-            label="Password" 
-            value={password} 
-            onChangeText={setPassword} 
-            placeholder="••••••••"
-            secureTextEntry
-          />
-        </View>
-
-        <View className="gap-y-4">
-          <AppButton 
-            title={loading ? "Authenticating..." : "Login as Client"} 
-            onPress={() => handleLogin('CLIENT')} 
-            disabled={loading}
-          />
+      <View className={contentStyle}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           
-          <View className={isWeb ? "flex-row gap-x-4" : "gap-y-4"}>
-            <View className={isWeb ? "flex-1" : "w-full"}>
-              <AppButton 
-                title="Legal Queue" 
-                variant="ghost"
-                onPress={() => handleLogin('LEGAL')} 
-                disabled={loading}
-              />
-            </View>
-            <View className={isWeb ? "flex-1" : "w-full"}>
-              <AppButton 
-                title="Admin Ledger" 
-                variant="ghost"
-                onPress={() => navigation.navigate('AdminPanel')} 
-                disabled={loading}
-              />
-            </View>
+          <View className="mb-10 items-center">
+            <Text className="text-brand-text text-4xl font-black tracking-tighter">VeriFlow</Text>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+
+          <InfoCard className="mb-8">
+            <View className="flex-row bg-brand-dark rounded-xl p-1 mb-6 border border-brand-border">
+              {ROLES.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => setRole(r.id)}
+                  activeOpacity={0.8}
+                  className={`flex-1 py-3 rounded-lg items-center transition-colors ${
+                    role === r.id ? 'bg-brand-card border border-brand-primary/30 shadow-md' : 'bg-transparent'
+                  }`}
+                >
+                  <Text className={`text-[10px] font-black uppercase tracking-widest ${
+                    role === r.id ? 'text-brand-primary' : 'text-brand-muted'
+                  }`}>
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <InputField 
+              label="User Email" 
+              value={email} 
+              onChangeText={setEmail} 
+              placeholder="someone@example.com" 
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            
+            <InputField 
+              label="Password" 
+              value={password} 
+              onChangeText={setPassword} 
+              secureTextEntry
+              placeholder="****" 
+            />
+
+            <AppButton 
+              title="Authenticate" 
+              loading={loading} 
+              onPress={handleLogin} 
+              className="mt-4"
+            />
+          </InfoCard>
+
+          <Text className="text-brand-muted text-[10px] text-center font-black uppercase tracking-widest leading-5 px-4">
+            Authorized access only. 
+          </Text>
+
+        </ScrollView>
+      </View>
     </View>
   );
 }

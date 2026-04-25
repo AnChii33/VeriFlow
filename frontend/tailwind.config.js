@@ -1,23 +1,27 @@
+/** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./App.{js,jsx,ts,tsx}",
-    "./src/**/*.{js,jsx,ts,tsx}"
-  ],
-  presets: [require("nativewind/preset")],
+  // Content tells Tailwind where to look for your classes
+  content: ["./App.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
+  
+  // CRITICAL: This was missing and is why you get the "NativeWind preset" error
+  presets: [require("nativewind/preset")], 
+  
   theme: {
     extend: {
       colors: {
         brand: {
-          dark: '#020617',
-          card: '#0f172a',
-          blue: '#3b82f6',
-          success: '#10b981',
-          warning: '#f59e0b',
-          danger: '#ef4444',
-          border: '#1e293b'
+          dark: '#080808',
+          card: '#1A1412',
+          border: '#3D2C24',
+          primary: '#EAB308',
+          primaryDark: '#CA8A04',
+          text: '#FAFAF9',
+          muted: '#A8A29E',
+          danger: '#EF4444',
+          success: '#84CC16',
         }
       }
     },
   },
   plugins: [],
-};
+}

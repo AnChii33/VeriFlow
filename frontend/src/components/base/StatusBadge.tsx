@@ -1,23 +1,33 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { FSMStatus } from '../../types';
 
-const badgeStyles = {
-  pending_ai_flags: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  pending_legal: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-  pending_ai_redrafts: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  pending_client_action: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-  approved: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-};
+interface StatusBadgeProps {
+  status: string;
+}
 
-export default function StatusBadge({ status }: { status: FSMStatus }) {
-  const current = badgeStyles[status] || badgeStyles.pending_ai_flags;
-  const parts = current.split(' ');
+export default function StatusBadge({ status }: StatusBadgeProps) {
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'approved':
+        return { bg: 'bg-brand-success/10', border: 'border-brand-success', text: 'text-brand-success', label: 'Approved' };
+      case 'pending_ai_flags':
+      case 'pending_ai_redrafts':
+        return { bg: 'bg-brand-primary/10', border: 'border-brand-primary', text: 'text-brand-primary', label: 'AI Processing' };
+      case 'pending_legal':
+        return { bg: 'bg-brand-primary/10', border: 'border-brand-primary', text: 'text-brand-primary', label: 'Pending Legal' };
+      case 'pending_client_action':
+        return { bg: 'bg-brand-danger/10', border: 'border-brand-danger', text: 'text-brand-danger', label: 'Action Required' };
+      default:
+        return { bg: 'bg-brand-border/30', border: 'border-brand-border', text: 'text-brand-muted', label: status };
+    }
+  };
+
+  const config = getStatusConfig();
 
   return (
-    <View className={`px-3 py-1 rounded-full border ${parts[0]} ${parts[2]}`}>
-      <Text className={`text-[9px] font-black uppercase tracking-widest ${parts[1]}`}>
-        {status.replace(/_/g, ' ')}
+    <View className={`px-3 py-1 rounded-full border ${config.bg} ${config.border} self-start`}>
+      <Text className={`${config.text} text-[10px] font-black uppercase tracking-widest`}>
+        {config.label}
       </Text>
     </View>
   );

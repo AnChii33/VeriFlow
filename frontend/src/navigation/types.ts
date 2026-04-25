@@ -1,12 +1,12 @@
-import { FSMStatus } from '../types';
+import { Template } from '../types';
 
 export type RootStackParamList = {
-  Auth: undefined;
+  AuthScreen: undefined;
   AdminPanel: undefined;
-  AuditTrailScreen: { templateId: string };
   ClientDashboard: { clientId: string };
-  SubmitDraft: { clientId: string };
-  RedraftAction: { templateId: string }; 
   ReviewerDashboard: { reviewerId: string };
-  RedraftReviewScreen: { templateId: string; reviewerId: string };
+  SubmitDraft: { clientId: string };
+  AuditTrailScreen: { template: Template };
+  RedraftAction: { template: Template; clientId: string };
+  RedraftReviewScreen: { template: Template; reviewerId: string };
 };

@@ -1,114 +1,158 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
-import { veriflowApi } from '../../services/api';
-import { Template } from '../../types';
-import StatusBadge from '../../components/base/StatusBadge';
-import InfoCard from '../../components/layout/InfoCard';
-import MetricCard from '../../components/layout/MetricCard';
-import AppButton from '../../components/base/AppButton';
+// src/features/client/ClientDashboard.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/types';
+import { veriflowApi } from '../../services/api';
 import { getDeviceTrace } from '../../utils/platform';
+import InfoCard from '../../components/layout/InfoCard';
+import AppButton from '../../components/base/AppButton';
+import StatusBadge from '../../components/base/StatusBadge';
+import MetricCard from '../../components/layout/MetricCard';
 
 export default function ClientDashboard({ route }: any) {
+  const navigation = useNavigation<any>();
   const { clientId } = route.params;
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const { isWeb } = getDeviceTrace();
 
-  const loadData = async () => {
-    setLoading(true);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchTemplates = async () => {
     try {
-      const data = await veriflowApi.getLedger();
-      setTemplates(data.filter(t => t.clientId === clientId));
+      const data = await veriflowApi.getClientTemplates(clientId);
+      setTemplates(data);
     } catch (e) {
-      console.error(e);
+      Alert.alert("Error", "Failed to fetch secure records.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // Re-fetch data every time the user navigates back to this screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchTemplates();
+    });
+    return unsubscribe;
+  }, [navigation, clientId]);
 
-  const renderItem = ({ item }: { item: Template }) => (
-    <InfoCard className="mb-4">
-      <View className="flex-row justify-between items-center mb-4">
-        <View className="flex-1 mr-4">
-          <Text className="text-white text-lg font-black">{item.title}</Text>
-          <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-            {item.documentType} • ID: {item.id.split('-')[0]}
-          </Text>
-        </View>
-        <StatusBadge status={item.status} />
-      </View>
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchTemplates();
+  };
 
-      {item.status === 'pending_client_action' && (
-        <View className="flex-row gap-x-3 mt-2">
-          <AppButton 
-            title="Review Redrafts" 
-            variant="primary" 
-            className="flex-1 h-10"
-            onPress={() => navigation.navigate('AuditTrailScreen', { templateId: item.id })}
-          />
-        </View>
-      )}
-      
-      {item.status === 'approved' && (
-        <View className="bg-emerald-500/5 border border-emerald-500/10 p-3 rounded-xl mt-2">
-          <Text className="text-emerald-500 text-[10px] font-bold text-center uppercase tracking-widest">
-            Cryptographically Certified
-          </Text>
-        </View>
-      )}
-    </InfoCard>
-  );
+  const handleTemplateClick = (template: any) => {
+    if (template.status === 'pending_client_action') {
+      // Needs user decision on the AI modifications
+      navigation.navigate('RedraftAction', { template, clientId });
+    } else {
+      // Just viewing the history
+      navigation.navigate('AuditTrailScreen', { template });
+    }
+  };
 
-  const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center py-10" 
-    : "flex-1 bg-brand-dark px-6 pt-12";
+  // --- RESPONSIVE STYLING ---
+  const containerStyle = "flex-1 bg-brand-dark";
+  const contentStyle = isWeb ? "w-full max-w-5xl mx-auto p-8" : "p-4";
 
-  const contentStyle = isWeb 
-    ? "w-full max-w-5xl bg-brand-card p-10 rounded-3xl border border-slate-800 shadow-2xl flex-1" 
-    : "w-full flex-1";
+  // Calculate Metrics
+  const actionRequiredCount = templates.filter(t => t.status === 'pending_client_action').length;
+  const approvedCount = templates.filter(t => t.status === 'approved').length;
 
   return (
     <View className={containerStyle}>
-      <View className={contentStyle}>
-        <View className="mb-8">
-          <Text className="text-white text-3xl font-black tracking-tighter">My Documents</Text>
-          <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[4px]">
-            VeriFlow Client Portal
+      {/* Dashboard Header */}
+      <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
+        <View>
+          <Text className="text-brand-text text-2xl font-black tracking-tighter">Client Terminal</Text>
+          <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest mt-1">
+            System ID: {clientId.substring(0, 8)}
           </Text>
         </View>
-
-        <View className="flex-row gap-x-4 mb-8">
-          <MetricCard label="In Progress" value={templates.filter(t => t.status !== 'approved').length} />
-          <MetricCard label="Approved" value={templates.filter(t => t.status === 'approved').length} />
+        
+        <View className="flex-row items-center gap-3">
+          {/* Hide logout text on small mobile screens to save space, but keep the button */}
+          <AppButton 
+            title={isWeb ? "Logout" : "Exit"} 
+            variant="ghost" 
+            onPress={() => navigation.replace('AuthScreen')} 
+            className="w-16 sm:w-24 h-10" 
+          />
+          <AppButton 
+            title="+ New Draft" 
+            onPress={() => navigation.navigate('SubmitDraft', { clientId })} 
+            className="w-28 sm:w-32 h-10" 
+          />
         </View>
-
-        <FlatList
-          data={templates}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor="#3b82f6" />}
-          ListEmptyComponent={
-            <View className="items-center justify-center py-20">
-              <Text className="text-slate-600 font-bold uppercase tracking-widest text-[10px]">No Documents Found</Text>
-            </View>
-          }
-        />
-
-        <AppButton 
-          title="Submit New Template" 
-          variant="primary" 
-          className="mb-6 mt-4"
-          onPress={() => navigation.navigate('SubmitDraft', { clientId })} 
-        />
       </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#EAB308" />}
+      >
+        <View className={contentStyle}>
+          {loading ? (
+            <ActivityIndicator size="large" color="#EAB308" className="mt-20" />
+          ) : (
+            <>
+              {/* Dynamic Metrics */}
+              <View className={isWeb ? "flex-row gap-4 mb-8" : "mb-6 gap-y-4"}>
+                <View className="flex-1"><MetricCard label="Total Drafts" value={templates.length} /></View>
+                <View className="flex-1"><MetricCard label="Action Required" value={actionRequiredCount} /></View>
+                <View className="flex-1"><MetricCard label="Approved" value={approvedCount} /></View>
+              </View>
+
+              <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">Recent Documents</Text>
+
+              {/* Empty State */}
+              {templates.length === 0 ? (
+                <InfoCard className="items-center py-10">
+                  <Text className="text-brand-muted font-bold text-center">No documents found.</Text>
+                  <Text className="text-brand-muted text-xs mt-2 text-center">Click "+ New Draft" to submit a document to the system.</Text>
+                </InfoCard>
+              ) : (
+                /* Document List */
+                templates.map((doc) => (
+                  <TouchableOpacity 
+                    key={doc.id} 
+                    activeOpacity={0.8} 
+                    onPress={() => handleTemplateClick(doc)}
+                  >
+                    <InfoCard className={`mb-4 ${doc.status === 'pending_client_action' ? 'border-brand-danger/50' : ''}`}>
+                      <View className="flex-row justify-between items-start mb-3">
+                        <View className="flex-1 pr-4">
+                          <Text className="text-brand-text text-lg font-black tracking-tight">{doc.title}</Text>
+                          <Text className="text-brand-muted text-[10px] font-black uppercase tracking-widest mt-1">
+                            Type: {doc.documentType}
+                          </Text>
+                        </View>
+                        <StatusBadge status={doc.status} />
+                      </View>
+                      
+                      <View className="h-[1px] w-full bg-brand-border my-3" />
+                      
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-brand-muted text-xs">
+                          Updated: <Text className="text-brand-text">{new Date(doc.updatedAt).toLocaleDateString()}</Text>
+                        </Text>
+                        
+                        {/* Contextual Action Text */}
+                        {doc.status === 'pending_client_action' ? (
+                          <Text className="text-brand-danger text-[10px] font-black uppercase tracking-widest">Review AI Redraft →</Text>
+                        ) : (
+                          <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest">View Details →</Text>
+                        )}
+                      </View>
+                    </InfoCard>
+                  </TouchableOpacity>
+                ))
+              )}
+            </>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }

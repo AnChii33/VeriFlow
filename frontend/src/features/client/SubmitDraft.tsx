@@ -1,7 +1,8 @@
+// src/features/client/SubmitDraft.tsx
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker'; // Standard dependency
+import { Picker } from '@react-native-picker/picker'; 
 import { veriflowApi } from '../../services/api';
 import InputField from '../../components/base/InputField';
 import AppButton from '../../components/base/AppButton';
@@ -15,15 +16,13 @@ export default function SubmitDraft({ route }: any) {
   const [title, setTitle] = useState('');
   const [docType, setDocType] = useState('Messaging Template');
   const [content, setContent] = useState('');
-  const [password, setPassword] = useState(''); // New Password State
   const [loading, setLoading] = useState(false);
 
   const { isWeb } = getDeviceTrace();
 
   const handleSubmit = async () => {
-    // Added password to the validation check
-    if (!title || !content || !password) {
-      Alert.alert("Validation Error", "All fields, including signing password, are required.");
+    if (!title || !content) {
+      Alert.alert("Validation Error", "All fields are required.");
       return;
     }
 
@@ -37,7 +36,7 @@ export default function SubmitDraft({ route }: any) {
       });
       navigation.goBack();
     } catch (e) {
-      Alert.alert("Submission Failure", "Ledger connection failed.");
+      Alert.alert("Submission Failure", "System connection failed.");
     } finally {
       setLoading(false);
     }
@@ -48,7 +47,7 @@ export default function SubmitDraft({ route }: any) {
     : "flex-1 bg-brand-dark";
 
   const contentStyle = isWeb 
-    ? "w-full max-w-5xl bg-brand-card p-10 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden" 
+    ? "w-full max-w-5xl px-6" 
     : "w-full px-6 pt-12";
 
   return (
@@ -56,8 +55,8 @@ export default function SubmitDraft({ route }: any) {
       <View className={contentStyle}>
         <ScrollView showsVerticalScrollIndicator={false}>
           <View className="mb-8">
-            <Text className="text-white text-3xl font-black tracking-tighter">New Template</Text>
-            <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[4px]">21 CFR Part 11 Entry</Text>
+            <Text className="text-brand-text text-3xl font-black tracking-tighter">New Template</Text>
+            <Text className="text-brand-muted text-[10px] font-black uppercase tracking-[4px]">System Entry</Text>
           </View>
 
           <InfoCard className="mb-6">
@@ -71,17 +70,17 @@ export default function SubmitDraft({ route }: any) {
                 />
               </View>
               
-              {/* Category Dropdown Implementation */}
               <View className={isWeb ? "flex-1" : "w-full mb-6"}>
-                <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[2px] mb-2 ml-1">
+                <Text className="text-brand-muted text-[10px] font-black uppercase tracking-[2px] mb-2 ml-1">
                   Category
                 </Text>
-                <View className="bg-brand-dark border border-slate-800 rounded-2xl h-14 justify-center px-2">
+                <View className="bg-brand-card border-2 border-brand-border rounded-2xl h-14 justify-center px-2">
                   <Picker
                     selectedValue={docType}
                     onValueChange={(itemValue) => setDocType(itemValue)}
-                    dropdownIconColor="#475569"
-                    style={{ color: '#e2e8f0', backgroundColor: 'transparent' }}
+                    dropdownIconColor="#EAB308"
+                    // FIXED: Removed outline and border props
+                    style={{ color: '#FAFAF9', backgroundColor: 'transparent' }}
                   >
                     <Picker.Item label="Messaging Template" value="Messaging Template" />
                     <Picker.Item label="Legal Disclosure" value="Legal Disclosure" />
@@ -99,15 +98,6 @@ export default function SubmitDraft({ route }: any) {
               multiline 
               numberOfLines={isWeb ? 10 : 5}
               placeholder="Enter the template content here..."
-            />
-
-            {/* Added Password Field */}
-            <InputField 
-              label="Signing Password" 
-              value={password} 
-              onChangeText={setPassword} 
-              secureTextEntry // Hides text for security
-              placeholder="Confirm identity to sign ledger..."
             />
           </InfoCard>
 

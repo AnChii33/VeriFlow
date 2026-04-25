@@ -1,50 +1,49 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator } from 'react-native';
 
-interface Props {
+interface AppButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'success' | 'danger' | 'ghost';
+  variant?: 'primary' | 'ghost' | 'danger' | 'success';
   loading?: boolean;
-  disabled?: boolean;
   className?: string;
 }
-
-const variantStyles = {
-  primary: 'bg-blue-600 border-blue-500',
-  success: 'bg-emerald-600 border-emerald-500',
-  danger: 'bg-red-600 border-red-500',
-  ghost: 'bg-transparent border-slate-800'
-};
-
-const textStyles = {
-  primary: 'text-white',
-  success: 'text-white',
-  danger: 'text-white',
-  ghost: 'text-slate-400'
-};
 
 export default function AppButton({ 
   title, 
   onPress, 
   variant = 'primary', 
-  loading, 
-  disabled, 
-  className 
-}: Props) {
+  loading = false,
+  className = '' 
+}: AppButtonProps) {
+  
+  const baseStyles = "w-full h-14 rounded-xl flex-row items-center justify-center transition-colors";
+  
+  const variants = {
+    primary: "bg-brand-primary active:bg-brand-primaryDark",
+    ghost: "bg-transparent border-2 border-brand-border active:bg-brand-border/30",
+    danger: "bg-brand-danger/10 border border-brand-danger active:bg-brand-danger/20",
+    success: "bg-brand-success active:bg-brand-success/80",
+  };
+
+  const textStyles = {
+    primary: "text-brand-dark font-black tracking-widest uppercase", // Black text on Yellow button
+    ghost: "text-brand-muted font-bold tracking-wider",
+    danger: "text-brand-danger font-bold tracking-wider",
+    success: "text-brand-dark font-black tracking-widest uppercase",
+  };
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.7}
-      className={`h-14 w-full rounded-2xl border-b-4 items-center justify-center flex-row ${variantStyles[variant]} ${disabled ? 'opacity-50' : ''} ${className}`}
+    <TouchableOpacity 
+      onPress={onPress} 
+      disabled={loading}
+      activeOpacity={0.8}
+      className={`${baseStyles} ${variants[variant]} ${className} ${loading ? 'opacity-70' : ''}`}
     >
       {loading ? (
-        <ActivityIndicator color="white" size="small" />
+        <ActivityIndicator color={variant === 'primary' || variant === 'success' ? '#080808' : '#EAB308'} />
       ) : (
-        <Text className={`text-sm font-black uppercase tracking-[2px] ${textStyles[variant]}`}>
-          {title}
-        </Text>
+        <Text className={textStyles[variant]}>{title}</Text>
       )}
     </TouchableOpacity>
   );

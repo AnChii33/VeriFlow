@@ -1,93 +1,139 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+// src/features/reviewer/RedraftReviewScreen.tsx
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
-import { Template } from '../../types';
-import StatusBadge from '../../components/base/StatusBadge';
-import AppButton from '../../components/base/AppButton';
-import InfoCard from '../../components/layout/InfoCard';
-import TimelineStep from '../../components/layout/TimelineStep';
 import { getDeviceTrace } from '../../utils/platform';
+import InfoCard from '../../components/layout/InfoCard';
+import AppButton from '../../components/base/AppButton';
+import VersionBox from '../../components/layout/VersionBox';
+import StatusBadge from '../../components/base/StatusBadge';
 
-export default function RedraftReviewScreen({ route, navigation }: any) {
-  const { templateId, reviewerId } = route.params;
-  const [doc, setDoc] = useState<Template | null>(null);
-  const [loading, setLoading] = useState(false);
-
+export default function RedraftReviewScreen({ route }: any) {
+  const navigation = useNavigation<any>();
+  const { template, reviewerId } = route.params;
   const { isWeb } = getDeviceTrace();
 
-  useEffect(() => {
-    veriflowApi.getLedger().then(res => {
-      setDoc(res.find(t => t.id === templateId) || null);
-    });
-  }, []);
+  const [loading, setLoading] = useState(false);
 
-  const handleAction = async () => {
+  // Determine if the AI found any flags to show the appropriate UI state
+  const hasFlags = template.flags && template.flags.length > 0;
+
+  const handleDecision = async () => {
     setLoading(true);
     try {
-      await veriflowApi.reviewTemplate(templateId, reviewerId);
-      navigation.goBack();
-    } catch (e) {
-      Alert.alert("Review Failed", "State transition error.");
+      await veriflowApi.submitReviewDecision(template.id, reviewerId);
+      Alert.alert("Success", "Your review decision has been recorded securely.");
+      navigation.goBack(); // Return to the queue
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Failed to submit review.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (!doc) return null;
-
-  const containerStyle = isWeb 
-    ? "flex-1 bg-brand-dark items-center py-10" 
-    : "flex-1 bg-brand-dark";
-
-  const contentStyle = isWeb 
-    ? "w-full max-w-5xl bg-brand-card p-10 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden" 
-    : "w-full px-6 pt-12";
+  const containerStyle = "flex-1 bg-brand-dark";
+  const contentStyle = isWeb ? "w-full max-w-6xl mx-auto p-8" : "p-4 pt-8";
 
   return (
     <View className={containerStyle}>
-      <View className={contentStyle}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View className="mb-6">
-            <StatusBadge status={doc.status} />
-            <Text className="text-white text-3xl font-black mt-2 tracking-tighter">{doc.title}</Text>
+      {/* Header */}
+      <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row justify-between items-center">
+        <View className="flex-1 pr-4">
+          <Text className="text-brand-text text-2xl font-black tracking-tighter" numberOfLines={1}>
+            Legal Review
+          </Text>
+          <Text className="text-brand-primary text-[10px] font-black uppercase tracking-widest mt-1">
+            Template: {template.title}
+          </Text>
+        </View>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          className="bg-brand-dark px-4 py-2 rounded-lg border border-brand-border"
+        >
+          <Text className="text-brand-muted text-[10px] font-black uppercase tracking-widest">Back to Queue</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className={contentStyle}>
+          
+          <View className="flex-row items-center justify-between mb-6 px-2">
+            <Text className="text-brand-text text-xl font-black tracking-tighter">Document Analysis</Text>
+            <StatusBadge status={template.status} />
           </View>
 
-          <View className={isWeb ? "flex-row gap-x-8" : ""}>
-            <View className={isWeb ? "flex-1" : "w-full"}>
-              <InfoCard className="mb-8">
-                <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[2px] mb-3">Proposed Content</Text>
-                <Text className="text-slate-300 text-base leading-6">{doc.content}</Text>
+          {/* Document Meta Info */}
+          <View className={isWeb ? "flex-row gap-6 mb-8" : "mb-8 gap-y-4"}>
+            <View className="flex-1">
+              <InfoCard>
+                <Text className="text-brand-muted text-[10px] uppercase font-black tracking-widest mb-1">Author / Client</Text>
+                <Text className="text-brand-text font-bold text-lg">{template.client?.name || 'Unknown'}</Text>
+                <Text className="text-brand-muted text-xs">{template.client?.company?.name}</Text>
               </InfoCard>
             </View>
+            <View className="flex-1">
+              <InfoCard>
+                <Text className="text-brand-muted text-[10px] uppercase font-black tracking-widest mb-1">Document Type</Text>
+                <Text className="text-brand-text font-bold text-lg">{template.documentType}</Text>
+                <Text className="text-brand-muted text-xs">ID: {template.id.substring(0, 8)}</Text>
+              </InfoCard>
+            </View>
+          </View>
 
-            <View className={isWeb ? "flex-1" : "w-full"}>
-              <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px] mb-4">AI Flag Analysis</Text>
-              {doc.flags.map((flag, i) => (
-                <TimelineStep key={flag.id} isLast={i === doc.flags.length - 1}>
-                  <View className="bg-brand-card/50 border border-slate-800 p-4 rounded-2xl mb-2">
-                    <Text className="text-red-400 text-[10px] font-black uppercase mb-1">{flag.cfr_section}</Text>
-                    <Text className="text-slate-400 text-xs leading-5">{flag.explanation}</Text>
+          {/* Content View */}
+          <View className="mb-8">
+            <VersionBox 
+              label="Submitted Content" 
+              content={template.content} 
+              isActive={false} 
+            />
+          </View>
+
+          {/* System Flags Section */}
+          <Text className="text-brand-text text-xl font-black tracking-tighter mb-4 px-2">System Flags</Text>
+          <InfoCard className="mb-8">
+            {hasFlags ? (
+              template.flags.map((flag: any, index: number) => (
+                <View key={flag.id || index} className={`p-4 bg-brand-dark rounded-xl border border-brand-danger/30 ${index !== template.flags.length - 1 ? 'mb-4' : ''}`}>
+                  <View className="flex-row items-center mb-2">
+                    <View className="w-2 h-2 rounded-full bg-brand-danger mr-2" />
+                    <Text className="text-brand-danger text-xs font-black uppercase tracking-widest">
+                      Section: {flag.cfr_section}
+                    </Text>
                   </View>
-                </TimelineStep>
-              ))}
-            </View>
-          </View>
+                  <Text className="text-brand-text text-sm leading-6">
+                    {flag.explanation}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <View className="py-6 items-center">
+                <Text className="text-brand-success font-bold text-lg mb-1">No Issues Detected</Text>
+                <Text className="text-brand-muted text-center text-xs">The system analysis did not find any regulatory flags in this document.</Text>
+              </View>
+            )}
+          </InfoCard>
 
-          <View className={`mt-8 mb-12 ${isWeb ? "items-center border-t border-slate-800 pt-8" : ""}`}>
-            <View className={isWeb ? "w-80" : "w-full"}>
-              <AppButton 
-                title="Authorize Decision" 
-                variant="primary" 
-                loading={loading}
-                onPress={handleAction} 
-              />
-            </View>
-            <Text className="text-slate-600 text-[8px] text-center mt-4 uppercase tracking-widest leading-4">
-              By authorizing, you confirm review of all flags. If flags exist, system will trigger AI redrafts. If clean, template will be approved.
+          {/* Action Area */}
+          <InfoCard className="mb-12">
+            <Text className="text-brand-text text-lg font-black tracking-tight mb-2">Reviewer Decision</Text>
+            <Text className="text-brand-muted text-sm leading-6 mb-6">
+              {hasFlags 
+                ? "By confirming these flags, the document will be sent back to the system for an automated redraft to resolve the issues." 
+                : "As no flags were detected, signing this will fully approve the document and finalize it in the secure ledger."}
             </Text>
-          </View>
-        </ScrollView>
-      </View>
+            
+            <AppButton 
+              title={hasFlags ? "Confirm Flags & Request Redraft" : "Sign & Approve Document"} 
+              variant={hasFlags ? "primary" : "success"}
+              loading={loading}
+              onPress={handleDecision} 
+            />
+          </InfoCard>
+
+        </View>
+      </ScrollView>
     </View>
   );
 }

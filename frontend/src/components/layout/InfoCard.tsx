@@ -1,14 +1,17 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, ViewProps } from 'react-native';
 
-interface Props {
+interface InfoCardProps extends ViewProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export default function InfoCard({ children, className }: Props) {
+export default function InfoCard({ children, className = '', ...props }: InfoCardProps) {
   return (
-    <View className={`bg-brand-card rounded-3xl p-6 border border-slate-800 shadow-2xl ${className}`}>
+    <View 
+      {...props}
+      className={`bg-brand-card border border-brand-border rounded-3xl p-6 shadow-xl ${className}`}
+    >
       {children}
     </View>
   );

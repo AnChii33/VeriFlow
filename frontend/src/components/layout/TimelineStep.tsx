@@ -1,21 +1,24 @@
 import React from 'react';
 import { View } from 'react-native';
 
-interface Props {
+interface TimelineStepProps {
   children: React.ReactNode;
   isLast?: boolean;
 }
 
-export default function TimelineStep({ children, isLast }: Props) {
+export default function TimelineStep({ children, isLast = false }: TimelineStepProps) {
   return (
     <View className="flex-row">
-      <View className="items-center mr-4">
-        <View className="w-3 h-3 rounded-full bg-brand-blue z-10 shadow-lg shadow-brand-blue/50" />
+      {/* Timeline Line & Dot */}
+      <View className="w-8 items-center mr-2 relative">
+        <View className="w-3 h-3 rounded-full bg-brand-primary border-4 border-brand-dark z-10 mt-2" />
         {!isLast && (
-          <View className="w-[1.5px] flex-1 bg-slate-800 -mt-1" />
+          <View className="absolute top-4 bottom-0 w-0.5 bg-brand-border -mb-8" />
         )}
       </View>
-      <View className={`flex-1 ${!isLast ? 'pb-10' : 'pb-2'}`}>
+      
+      {/* Content */}
+      <View className="flex-1 pb-8">
         {children}
       </View>
     </View>

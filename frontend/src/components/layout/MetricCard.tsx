@@ -1,29 +1,20 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
-interface Props {
+interface MetricCardProps {
   label: string;
-  value: string | number;
-  trend?: string;
-  className?: string;
+  value: number | string;
 }
 
-export default function MetricCard({ label, value, trend, className }: Props) {
+export default function MetricCard({ label, value }: MetricCardProps) {
   return (
-    <View className={`flex-1 bg-brand-card rounded-2xl p-5 border border-slate-800 ${className}`}>
-      <Text className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1">
+    <View className="bg-brand-card border-l-4 border-l-brand-primary border border-brand-border rounded-2xl p-5 shadow-lg">
+      <Text className="text-brand-muted text-[10px] font-black uppercase tracking-[2px] mb-2">
         {label}
       </Text>
-      <View className="flex-row items-baseline">
-        <Text className="text-white text-2xl font-black">
-          {value}
-        </Text>
-        {trend && (
-          <Text className="ml-2 text-brand-success text-[10px] font-bold">
-            {trend}
-          </Text>
-        )}
-      </View>
+      <Text className="text-brand-text text-4xl font-black tracking-tighter">
+        {value}
+      </Text>
     </View>
   );
 }
