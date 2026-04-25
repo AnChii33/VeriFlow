@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- CORE ENTITIES ---
 model Company {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -16,9 +17,8 @@ model Company {
 }
 
 model Client {
-  id           String            @id @default(uuid())
+  id           String            @id 
   email        String            @unique
-  password     String            // Added for AuthScreen
   name         String
   companyId    String
   company      Company           @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -28,9 +28,8 @@ model Client {
 }
 
 model LegalReviewer {
-  id           String            @id @default(uuid())
+  id           String            @id 
   email        String            @unique
-  password     String            // Added for AuthScreen
   name         String
   barNumber    String?
   createdAt    DateTime          @default(now())
@@ -39,17 +38,26 @@ model LegalReviewer {
 }
 
 model Admin {
-  id        String   @id @default(uuid())
+  id        String   @id 
   email     String   @unique
-  password  String   // Added for AuthScreen
   name      String
   createdAt DateTime @default(now())
 }
 
+// --- AUTHENTICATION ---
+model Credential {
+  id        String   @id @default(uuid())
+  userId    String   @unique // Maps to ClientID, ReviewerID, or AdminID
+  role      String   // 'CLIENT', 'LEGAL_REVIEWER', 'ADMIN'
+  password  String   // Store hashed passwords here in prod
+  updatedAt DateTime @updatedAt
+}
+
+// --- LEDGER & STATE ---
 model Template {
   id           String              @id @default(uuid())
   content      String              @db.Text
-  status       String
+  status       String              // "pending_ai_flags" -> "pending_legal" -> "pending_ai_redrafts" -> "pending_client_action" -> "approved"
   title        String
   documentType String
   clientId     String
