@@ -7,7 +7,7 @@ import {
   TouchableOpacity, 
   Alert, 
   ActivityIndicator,
-  useWindowDimensions // <--- THE SILVER BULLET
+  useWindowDimensions 
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { veriflowApi } from '../../services/api';
@@ -26,7 +26,6 @@ export default function AdminPanel({ route }: any) {
   const { isWeb } = getDeviceTrace();
   const { adminId } = route.params;
   
-  // Physically measure the exact screen height
   const { height: screenHeight } = useWindowDimensions(); 
   
   const [activeTab, setActiveTab] = useState<Tab>('LEDGER');
@@ -56,16 +55,35 @@ export default function AdminPanel({ route }: any) {
     try {
       if (activeTab === 'LEDGER') {
         const ledgerData = await veriflowApi.getAdminLedger();
-        setLedger(ledgerData);
+        setLedger(Array.isArray(ledgerData) ? ledgerData : []);
       } else {
         const comps = await veriflowApi.getCompanies();
         const usrs = await veriflowApi.getUsers();
-        setCompanies(comps);
-        setUsers(usrs);
-        if (comps.length > 0 && !selectedCompanyId) setSelectedCompanyId(comps[0].id);
+        
+        const validComps = Array.isArray(comps) ? comps : [];
+        setCompanies(validComps);
+        
+        // ANTI-CRASH FIX: Handle both Array (old backend) and Object (new backend) formats gracefully
+        if (Array.isArray(usrs)) {
+           setUsers({
+             clients: usrs.filter((u: any) => u.role === 'CLIENT'),
+             reviewers: usrs.filter((u: any) => u.role === 'LEGAL_REVIEWER'),
+             admins: usrs.filter((u: any) => u.role === 'ADMIN')
+           });
+        } else {
+           setUsers({
+             clients: usrs?.clients || [],
+             reviewers: usrs?.reviewers || [],
+             admins: usrs?.admins || []
+           });
+        }
+
+        if (validComps.length > 0 && !selectedCompanyId) {
+          setSelectedCompanyId(validComps[0].id);
+        }
       }
     } catch (e) {
-      Alert.alert("Error", "Failed to load system data.");
+      Alert.alert("Error", "Failed to load system data. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -130,11 +148,11 @@ export default function AdminPanel({ route }: any) {
   const renderLedger = () => (
     <View>
       <View className={isWeb ? "flex-row gap-4 mb-6" : "mb-6 gap-y-4"}>
-        <View className="flex-1"><MetricCard label="Total Records" value={ledger.length} /></View>
-        <View className="flex-1"><MetricCard label="Approved" value={ledger.filter(l => l.status === 'approved').length} /></View>
+        <View className="flex-1"><MetricCard label="Total Records" value={ledger?.length || 0} /></View>
+        <View className="flex-1"><MetricCard label="Approved" value={(ledger || []).filter(l => l.status === 'approved').length} /></View>
       </View>
 
-      {ledger.map((doc) => (
+      {(ledger || []).map((doc) => (
         <TouchableOpacity 
           key={doc.id} 
           activeOpacity={0.8}
@@ -191,8 +209,8 @@ export default function AdminPanel({ route }: any) {
           <Text className="text-brand-text text-xl font-black mb-4 tracking-tighter">Active Entities</Text>
           
           <Text className="text-brand-primary text-xs font-black uppercase tracking-widest mb-2 mt-4">Companies</Text>
-          {companies.length === 0 && <Text className="text-brand-muted text-xs italic mb-2">No active companies.</Text>}
-          {companies.map(c => (
+          {(!companies || companies.length === 0) && <Text className="text-brand-muted text-xs italic mb-2">No active companies.</Text>}
+          {(companies || []).map(c => (
             <View key={c.id} className="flex-row justify-between items-center bg-brand-dark p-3 rounded-xl border border-brand-border mb-2">
               <View>
                 <Text className="text-brand-text font-bold">{c.name}</Text>
@@ -208,8 +226,8 @@ export default function AdminPanel({ route }: any) {
           ))}
           
           <Text className="text-brand-primary text-xs font-black uppercase tracking-widest mb-2 mt-4">Clients</Text>
-          {users.clients.length === 0 && <Text className="text-brand-muted text-xs italic mb-2">No active clients.</Text>}
-          {users.clients.map(u => (
+          {(!users?.clients || users.clients.length === 0) && <Text className="text-brand-muted text-xs italic mb-2">No active clients.</Text>}
+          {(users?.clients || []).map(u => (
             <View key={u.id} className="flex-row justify-between items-center bg-brand-dark p-3 rounded-xl border border-brand-border mb-2">
               <View>
                 <Text className="text-brand-text font-bold">{u.name}</Text>
@@ -220,8 +238,8 @@ export default function AdminPanel({ route }: any) {
           ))}
 
           <Text className="text-brand-primary text-xs font-black uppercase tracking-widest mb-2 mt-6">Legal Team</Text>
-          {users.reviewers.length === 0 && <Text className="text-brand-muted text-xs italic mb-2">No active reviewers.</Text>}
-          {users.reviewers.map(u => (
+          {(!users?.reviewers || users.reviewers.length === 0) && <Text className="text-brand-muted text-xs italic mb-2">No active reviewers.</Text>}
+          {(users?.reviewers || []).map(u => (
             <View key={u.id} className="flex-row justify-between items-center bg-brand-dark p-3 rounded-xl border border-brand-border mb-2">
               <View>
                 <Text className="text-brand-text font-bold">{u.name}</Text>
@@ -250,11 +268,11 @@ export default function AdminPanel({ route }: any) {
           ))}
         </View>
 
-        {newUserRole === 'CLIENT' && companies.length > 0 && (
+        {newUserRole === 'CLIENT' && (companies || []).length > 0 && (
           <View className="mb-5">
             <Text className="text-brand-muted text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Assign to Company</Text>
             <View className="flex-row flex-wrap gap-2">
-              {companies.map(c => (
+              {(companies || []).map(c => (
                 <TouchableOpacity 
                   key={c.id} 
                   onPress={() => setSelectedCompanyId(c.id)} 
@@ -267,7 +285,7 @@ export default function AdminPanel({ route }: any) {
           </View>
         )}
 
-        {newUserRole === 'CLIENT' && companies.length === 0 && (
+        {newUserRole === 'CLIENT' && (!companies || companies.length === 0) && (
           <Text className="text-brand-danger text-xs mb-4">
             You must register a Company first before provisioning a Client.
           </Text>
@@ -285,10 +303,8 @@ export default function AdminPanel({ route }: any) {
   );
 
   return (
-    // THE FIX: Hardcoding `height: screenHeight` physically blocks the invisible infinite-stretch bug.
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
-      {/* Header (takes fixed space) */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border items-center flex-row justify-between">
         <View>
           <Text className="text-brand-text text-2xl font-black tracking-tighter">Admin Terminal</Text>
@@ -300,7 +316,6 @@ export default function AdminPanel({ route }: any) {
         <AppButton title="Logout" variant="ghost" onPress={() => navigation.replace('AuthScreen')} className="w-24 h-10" />
       </View>
 
-      {/* Tabs (takes fixed space) */}
       <View className="flex-row border-b border-brand-border bg-brand-dark">
         {['LEDGER', 'ENTITIES', 'PROVISION_USER'].map(tab => (
           <TouchableOpacity key={tab} onPress={() => setActiveTab(tab as Tab)} className={`flex-1 py-4 items-center ${activeTab === tab ? 'border-b-2 border-brand-primary' : ''}`}>
@@ -311,7 +326,6 @@ export default function AdminPanel({ route }: any) {
         ))}
       </View>
 
-      {/* ScrollView strictly calculates (Screen Height) minus (Header + Tabs) */}
       <ScrollView 
         style={{ flex: 1 }} 
         showsVerticalScrollIndicator={false} 

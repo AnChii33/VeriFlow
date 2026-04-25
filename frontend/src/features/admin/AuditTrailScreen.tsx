@@ -44,10 +44,8 @@ export default function AuditTrailScreen({ route }: any) {
   }
 
   return (
-    // FIX: Root View strictly fills screen and forces hidden overflow
     <View style={{ height: screenHeight, backgroundColor: '#080808', overflow: 'hidden' }}>
       
-      {/* Fixed Header */}
       <View className="pt-12 pb-6 px-6 bg-brand-card border-b border-brand-border flex-row items-center justify-between">
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
@@ -58,7 +56,6 @@ export default function AuditTrailScreen({ route }: any) {
         <StatusBadge status={template.status} />
       </View>
 
-      {/* FIX: ScrollView with hardcoded flex and web overflow */}
       <ScrollView 
         style={{ flex: 1, ...(isWeb && { overflowY: 'auto' as any }) }}
         showsVerticalScrollIndicator={false} 
@@ -76,7 +73,7 @@ export default function AuditTrailScreen({ route }: any) {
               <View className="flex-1 bg-brand-dark p-4 rounded-2xl border border-brand-border">
                 <Text className="text-brand-muted text-[10px] uppercase font-black tracking-widest mb-1">Author / Client</Text>
                 <Text className="text-brand-text font-bold">{template.client?.name || 'N/A'}</Text>
-                <Text className="text-brand-muted text-xs">{template.client?.email}</Text>
+                <Text className="text-brand-muted text-xs">{template.client?.email || 'N/A'}</Text>
               </View>
               <View className="flex-1 bg-brand-dark p-4 rounded-2xl border border-brand-border">
                 <Text className="text-brand-muted text-[10px] uppercase font-black tracking-widest mb-1">Legal Reviewer</Text>
