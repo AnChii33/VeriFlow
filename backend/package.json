@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "postinstall": "prisma generate"
   },
+  
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
