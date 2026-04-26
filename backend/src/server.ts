@@ -149,6 +149,9 @@ app.patch('/api/legal/review/:id', async (req: Request, res: Response) => {
 
     if (!template || !reviewer) return res.status(404).json({ error: 'Reference not found' });
 
+    // Capture the current status before the update for the audit log 
+    const prevState = template.status;
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Update individual flag statuses
       if (decisions && typeof decisions === 'object') {
@@ -173,10 +176,15 @@ app.patch('/api/legal/review/:id', async (req: Request, res: Response) => {
         data: { status: nextState, reviewerId }
       });
 
+      // 4. Create the Audit Log entry with prevState populated [cite: 9, 10, 17]
       await tx.auditLog.create({
         data: {
-          templateId: id, actorId: reviewerId, actorType: 'LEGAL_REVIEWER',
-          newState: nextState, details: `Legal review processed. ${confirmedFlags} flags confirmed.`
+          templateId: id, 
+          actorId: reviewerId, 
+          actorType: 'LEGAL_REVIEWER',
+          prevState: prevState, // Fixed: Now correctly tracking the state transition 
+          newState: nextState, 
+          details: `Legal review processed. ${confirmedFlags} flags confirmed.`
         }
       });
 
