@@ -6,6 +6,9 @@ on:
     paths: 
       - 'backend/**'
       - '.github/workflows/backend.yml'
+      - 'App_Data/**'  
+      - 'autoloop.py'  
+      - 'rag_pipe.py'  
 
 jobs:
   build-and-deploy:
